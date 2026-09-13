@@ -5,7 +5,7 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
-## Unreleased
+## 1.0.0 (2026-09-13)
 
 - First release. Everything `wiki-template` v1.1.3 shipped as files, as one preset: search
   (MiniSearch, Cmd+K), changelog dates from git with the committed snapshot, per-page og cards,

@@ -9,6 +9,7 @@ import wikiTheme from './theme';
 
 export type { WikiConfig };
 export { readWikiConfig };
+export { defineWikiConfig } from './define-config';
 
 /** The preset: every plugin a family wiki runs, configured from wiki.config.json. */
 export default function wikiPreset(context: LoadContext, options: Partial<WikiConfig> = {}) {

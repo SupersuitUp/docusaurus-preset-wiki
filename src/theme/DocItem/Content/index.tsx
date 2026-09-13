@@ -1,6 +1,10 @@
 import React, { type ReactNode, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import Content from '@theme-original/DocItem/Content';
+// @theme-init, not @theme-original: this wrapper lives in a THEME, so @theme-original would
+// resolve to itself and recurse until the heap dies (it did, 2026-09-13). @theme-init is the
+// component from the first theme that provides it, theme-classic. An INSTANCE that swizzles
+// DocItem/Content keeps using @theme-original and gets this wrapper.
+import Content from '@theme-init/DocItem/Content';
 import type ContentType from '@theme/DocItem/Content';
 import type { WrapperProps } from '@docusaurus/types';
 import ShareButton from '@theme/ShareButton';

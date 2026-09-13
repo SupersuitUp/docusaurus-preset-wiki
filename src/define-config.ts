@@ -78,8 +78,6 @@ export function defineWikiConfig(wiki: WikiConfig, overrides: Overrides = {}): C
     ],
 
     presets: [
-      // The family preset: search, changelog dates, og cards, manifest, share mirror, theme.
-      ['@supersuit/docusaurus-preset-wiki', { ...wiki }],
       [
         'classic',
         {
@@ -114,6 +112,13 @@ export function defineWikiConfig(wiki: WikiConfig, overrides: Overrides = {}): C
           sitemap: wiki.noindex ? false : undefined,
         } satisfies Preset.Options,
       ],
+      // The family preset: search, changelog dates, og cards, manifest, share mirror, theme.
+      // It comes AFTER classic on purpose: Docusaurus resolves @theme/<Component> against
+      // the LAST theme that provides it, so this order is what lets the preset's SearchBar
+      // and MDXComponents/A shadow theme-classic's. Reversed, the search trigger vanishes
+      // and the link wrapper never runs, which the template retarget's parity diff caught
+      // on 2026-09-13. The instance's own src/theme still wins over both.
+      ['@supersuit/docusaurus-preset-wiki', { ...wiki }],
     ],
 
     themeConfig: {

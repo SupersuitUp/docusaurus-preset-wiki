@@ -11,23 +11,26 @@ test('builds title, url and the preset entry', () => {
   const c = defineWikiConfig(wiki);
   assert.equal(c.title, 'T');
   assert.equal(c.url, 'https://t.wiki');
-  const preset = (c.presets as any[])[0];
-  assert.equal(preset[0], '@supersuit/docusaurus-preset-wiki');
-  assert.equal(preset[1].title, 'T');
+  const presets = c.presets as any[];
+  // classic FIRST, the family preset LAST: the last theme to provide a component wins,
+  // and the preset's SearchBar and MDXComponents/A must shadow theme-classic's.
+  assert.equal(presets[0][0], 'classic');
+  assert.equal(presets[1][0], '@supersuit/docusaurus-preset-wiki');
+  assert.equal(presets[1][1].title, 'T');
 });
 
 test('noindex adds the robots meta and disables the sitemap', () => {
   const c = defineWikiConfig(wiki);
   const robots = (c.headTags as any[]).find((t) => t.attributes?.name === 'robots');
   assert.equal(robots.attributes.content, 'noindex, nofollow');
-  const classic = (c.presets as any[])[1];
+  const classic = (c.presets as any[])[0];
   assert.equal(classic[1].sitemap, false);
 });
 
 test('an indexed wiki has no robots meta and keeps the sitemap', () => {
   const c = defineWikiConfig({ ...wiki, noindex: false });
   assert.equal((c.headTags as any[]).some((t) => t.attributes?.name === 'robots'), false);
-  assert.equal((c.presets as any[])[1][1].sitemap, undefined);
+  assert.equal((c.presets as any[])[0][1].sitemap, undefined);
 });
 
 test('theme-color comes from og.bg', () => {

@@ -67,6 +67,11 @@ test('a fixture instance builds from the package and emits every framework outpu
   assert.match(page, attr('content', '#101826'), 'theme-color from og.bg');
   assert.match(page, /property=("og:site_name"|og:site_name) content="Fixture Wiki"/, 'themeConfig metadata');
 
+  // Theme components must SHADOW theme-classic's, which only happens when the family
+  // preset is registered after classic. Two visible proofs on the rendered page:
+  assert.match(page, /aria-label=("Search"|Search)/, 'preset SearchBar rendered in the navbar (theme-classic\'s is empty)');
+  assert.match(page, /<a[^>]*href=("\/"|\/)[^>]*target=("_blank"|_blank)/, 'preset MDXComponents/A wrapper applied to a body link');
+
   const css = readdirSync(join(out, 'assets', 'css')).filter((f) => f.endsWith('.css'));
   assert.ok(css.length > 0, 'css emitted');
   const cssText = css.map((f) => readFileSync(join(out, 'assets', 'css', f), 'utf8')).join('\n');

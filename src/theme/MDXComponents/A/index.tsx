@@ -1,5 +1,6 @@
 import React, {type ReactNode} from 'react';
-import A from '@theme-original/MDXComponents/A';
+// @theme-init, not @theme-original: see DocItem/Content for why.
+import A from '@theme-init/MDXComponents/A';
 import type AType from '@theme/MDXComponents/A';
 import type {WrapperProps} from '@docusaurus/types';
 

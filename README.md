@@ -77,7 +77,22 @@ import ChangelogWidget from '@theme/ChangelogWidget';
 
 The middleware's order is load-bearing and lives in the package: training crawlers get 403
 first, then the share layer answers `/s/mint` and `/s/<sig>/<route>`, then the gate refuses.
-A gated wiki supplies only its verdict:
+
+**The family password gate ships in the package.** Set `WIKI_PASSWORD` and `WIKI_GATE_SECRET`
+on the deployment and the wiki is gated; unset them and the same file is an open wiki:
+
+```ts
+import { createMiddleware, createPasswordGate } from '@supersuit/docusaurus-preset-wiki/middleware';
+export { config } from '@supersuit/docusaurus-preset-wiki/middleware';
+export default createMiddleware({ gate: createPasswordGate() });
+```
+
+A preloaded link is `<any page>?key=<password>`: it sets a thirty-day ticket cookie and lands the
+reader on the page, with the key stripped from the address. Any capitalization of the password
+works. `llms.txt`, `skills/`, `generators/` and media stay open for agents that cannot answer a
+door. A password with no secret fails open and says so in an `x-wiki-gate` header.
+
+**A wiki with its own gate** (Google identity, a member list) supplies its verdict instead:
 
 ```ts
 import { createMiddleware, type GateVerdict } from '@supersuit/docusaurus-preset-wiki/middleware';

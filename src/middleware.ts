@@ -122,3 +122,6 @@ export const config = {
 
 /** An open wiki's middleware: bot-block and share layer, no gate. */
 export default createMiddleware();
+
+export { createPasswordGate, hasValidTicket } from './gate/passwordGate';
+export type { PasswordGateOptions } from './gate/passwordGate';

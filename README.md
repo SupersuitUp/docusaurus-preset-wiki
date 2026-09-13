@@ -39,8 +39,10 @@ export const config = {
 ```
 
 Start from [`SupersuitUp/wiki-template`](https://github.com/SupersuitUp/wiki-template), which is
-exactly this shape with sample docs. Upgrading is `pnpm up @supersuit/docusaurus-preset-wiki`,
-build, deploy.
+exactly this shape with sample docs. **Upgrading is `wiki upgrade`** in the wiki root: it moves the
+dependency to the newest release, prints the CHANGELOG entries between, and builds. **A wiki still
+carrying copied framework files (wiki-template v1.x) takes `wiki migrate`**, which is the v2.0.0
+ledger remedy as code and leaves a note for anything only a person can decide.
 
 ## What the preset does
 
@@ -57,7 +59,7 @@ and an instance's own `src/theme/` still shadows both.
 | theme | `DocItem/Content` (meta row: dates + share button under the H1), `MDXComponents/A` (external links open in a new tab), `ShareButton`, `PageDates`, `Changelog`, `ChangelogWidget`, and `wiki.css` (layout, typography, components; reads the instance's tokens) |
 | `defineWikiConfig(wiki, overrides?)` | the whole Docusaurus `Config` from `wiki.config.json`: head tags for icons and manifest, robots meta and sitemap from `noindex`, classic preset options including the index-stripping sidebar generator, `themeConfig` metadata, navbar, footer, prism, colour mode |
 | `./middleware` | `createMiddleware({ gate?, secret? })`, `UNFURL_BOT_PATTERN`, `BLOCKED_BOT_PATTERN`, `MATCHER`, `config`, `handleShare`; edge-safe, no Node built-ins |
-| `wiki` CLI | `wiki check` (owned-files, middleware, admonitions, llms, links, image-weight, provenance), `wiki gate set\|status\|link` (the deployed gate, through the Vercel API with read-back, redeploy and live checks), `wiki share`, `wiki icons`, `wiki optimize-images` |
+| `wiki` CLI | `wiki check` (owned-files, middleware, admonitions, llms, links, image-weight, provenance), `wiki migrate` (a v1.x copy onto the package), `wiki upgrade` (to the newest release, with the CHANGELOG between), `wiki gate set\|status\|link` (the deployed gate, through the Vercel API with read-back, redeploy and live checks), `wiki share`, `wiki icons`, `wiki optimize-images` |
 
 ## Per-wiki additions
 

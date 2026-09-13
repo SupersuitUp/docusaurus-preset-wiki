@@ -79,6 +79,8 @@ function help() {
   check [${Object.keys(CHECKS).join('|')}]
                        run one build-time check, or all of them in that order (the prebuild)
   share [...]          the unlock-link CLI: OPEN / UNLOCKED / BLOCKED / MINTABLE, focused shares
+  migrate              move a wiki still carrying copied framework files (wiki-template v1.x) onto the package
+  upgrade [--to v]     bring a wiki on the package to the newest release, printing the CHANGELOG between
   gate set|status|link the password gate of the deployed wiki: set or rotate it through the Vercel API,
                        verify by read-back, redeploy, check the live site (wiki gate --help)
   icons                draw the favicon and PWA icon set from wiki.config.json (python3 + Pillow)
@@ -116,6 +118,12 @@ switch (cmd) {
     break;
   case 'gate':
     status = node('gate.mjs', ...rest);
+    break;
+  case 'migrate':
+    status = node('migrate.mjs', ...rest);
+    break;
+  case 'upgrade':
+    status = node('upgrade.mjs', ...rest);
     break;
   case 'icons':
     status = python('build-icons.py', ...rest);

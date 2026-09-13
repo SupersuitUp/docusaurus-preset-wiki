@@ -5,6 +5,11 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## Unreleased
+
+- `wiki migrate`: the v2.0.0 upgrade-ledger remedy as code. Deletes what the package owns, writes the three-line config (keeping a customised one aside and naming what it carried), rewrites an open or password-gated middleware and leaves a custom gate alone by name, trims custom.css to its tokens, repoints docs imports, swaps the dependencies and scripts, installs and builds. Tested against the real wiki-template v1.1.3 tree.
+- `wiki upgrade [--to v]`: bump a wiki already on the package, print the CHANGELOG entries between the versions, flag a major, build.
+
 ## 1.0.0 (2026-09-13)
 
 - First release. Everything `wiki-template` v1.1.3 shipped as files, as one preset: search

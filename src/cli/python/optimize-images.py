@@ -77,14 +77,6 @@ TEXT_EXT = {".md", ".mdx", ".ts", ".tsx", ".js", ".jsx", ".json", ".html", ".yml
 
 dry = "--dry-run" in sys.argv
 
-# `--repair-sidecars` is the one-off for recipes written before the transform record existed.
-# It runs alone and converts nothing, because mixing a repair pass into a conversion run makes
-# the diff impossible to read.
-if "--repair-sidecars" in sys.argv:
-    print("[optimize-images] repairing sidecars whose asset still names the pre-conversion file")
-    n = repair_sidecars()
-    print(f"[optimize-images] repaired {n} sidecar(s)")
-    sys.exit(0)
 
 
 
@@ -257,6 +249,18 @@ def text_files():
         if (ROOT / f).exists():
             yield ROOT / f
 
+
+# `--repair-sidecars` is the one-off for recipes written before the transform record existed.
+# It runs alone and converts nothing, because mixing a repair pass into a conversion run makes
+# the diff impossible to read.
+if "--repair-sidecars" in sys.argv:
+    print("[optimize-images] repairing sidecars whose asset still names the pre-conversion file")
+    n = repair_sidecars()
+    print(f"[optimize-images] repaired {n} sidecar(s)")
+    sys.exit(0)
+# (This block sits AFTER repair_sidecars() is defined. It used to sit near the top of the file and
+# crashed with NameError on the one flag it existed for; carried over from an uncommitted fix in
+# wiki-template, 2026-09-13.)
 
 targets = [
     p for p in (ROOT / "static").rglob("*")

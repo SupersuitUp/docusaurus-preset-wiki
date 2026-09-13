@@ -5,6 +5,7 @@ import creationDatePlugin from './plugins/creation-date';
 import ogImagePlugin from './plugins/og-image';
 import manifestPlugin from './plugins/manifest';
 import shareViewPlugin from './plugins/share-view';
+import wikiTheme from './theme';
 
 export type { WikiConfig };
 export { readWikiConfig };
@@ -20,6 +21,6 @@ export default function wikiPreset(context: LoadContext, options: Partial<WikiCo
       [ogImagePlugin as unknown as PluginModule, wiki.og ?? {}],
       [shareViewPlugin as unknown as PluginModule, { title: wiki.title }],
     ],
-    themes: [] as PluginModule[],
+    themes: [wikiTheme as unknown as PluginModule],
   };
 }

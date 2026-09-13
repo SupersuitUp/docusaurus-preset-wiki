@@ -13,8 +13,26 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": false,
-    "types": ["node", "@docusaurus/module-type-aliases", "@docusaurus/theme-classic"]
+    "types": [
+      "node",
+      "@docusaurus/module-type-aliases",
+      "@docusaurus/theme-classic"
+    ],
+    "lib": [
+      "es2022",
+      "dom",
+      "dom.iterable"
+    ]
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/cli/**/*.mjs", "src/cli/python", "lib", "test"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/cli/**/*.mjs",
+    "src/cli/python",
+    "lib",
+    "test"
+  ]
 }

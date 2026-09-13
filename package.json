@@ -7,13 +7,27 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
-    ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" },
-    "./middleware": { "types": "./lib/middleware.d.ts", "default": "./lib/middleware.js" },
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./middleware": {
+      "types": "./lib/middleware.d.ts",
+      "default": "./lib/middleware.js"
+    },
     "./wiki.config.schema.json": "./wiki.config.schema.json",
     "./package.json": "./package.json"
   },
-  "bin": { "wiki": "lib/cli/wiki.mjs" },
-  "files": ["lib", "src", "wiki.config.schema.json", "README.md", "CHANGELOG.md"],
+  "bin": {
+    "wiki": "lib/cli/wiki.mjs"
+  },
+  "files": [
+    "lib",
+    "src",
+    "wiki.config.schema.json",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
     "test": "node --import tsx --test 'src/**/*.test.ts' 'src/**/*.test.mjs'",
@@ -44,6 +58,7 @@
     "@docusaurus/types": "3.10.1",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.3.0",
     "prism-react-renderer": "^2.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

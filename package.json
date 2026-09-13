@@ -1,0 +1,53 @@
+{
+  "name": "@supersuit/docusaurus-preset-wiki",
+  "version": "0.1.0",
+  "description": "The bones of every wiki in the Supersuit family, as one Docusaurus preset.",
+  "license": "MIT",
+  "repository": "github:SupersuitUp/docusaurus-preset-wiki",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" },
+    "./middleware": { "types": "./lib/middleware.d.ts", "default": "./lib/middleware.js" },
+    "./wiki.config.schema.json": "./wiki.config.schema.json",
+    "./package.json": "./package.json"
+  },
+  "bin": { "wiki": "lib/cli/wiki.mjs" },
+  "files": ["lib", "src", "wiki.config.schema.json", "README.md", "CHANGELOG.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "test": "node --import tsx --test 'src/**/*.test.ts' 'src/**/*.test.mjs'",
+    "test:fixture": "node --test test/build-fixture.test.mjs",
+    "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "@docusaurus/core": "^3.10.1",
+    "@docusaurus/preset-classic": "^3.10.1",
+    "prism-react-renderer": "^2.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "glob": "^13.0.6",
+    "gray-matter": "^4.0.3",
+    "minisearch": "^7.2.0",
+    "remark": "^15.0.1",
+    "satori": "^0.26.0",
+    "strip-markdown": "^6.0.0"
+  },
+  "devDependencies": {
+    "@docusaurus/core": "3.10.1",
+    "@docusaurus/module-type-aliases": "3.10.1",
+    "@docusaurus/preset-classic": "3.10.1",
+    "@docusaurus/tsconfig": "3.10.1",
+    "@docusaurus/types": "3.10.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "prism-react-renderer": "^2.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.9.0"
+  }
+}

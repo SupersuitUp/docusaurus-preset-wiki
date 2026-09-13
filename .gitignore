@@ -1,0 +1,7 @@
+node_modules/
+lib/
+test/fixture-site/node_modules/
+test/fixture-site/build/
+test/fixture-site/.docusaurus/
+test/fixture-site/static/search-index.json
+test/fixture-site/static/llms*.txt

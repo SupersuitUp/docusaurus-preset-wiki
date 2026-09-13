@@ -30,7 +30,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
-    "test": "node --import tsx --test 'src/**/*.test.ts' 'src/**/*.test.mjs'",
+    "test": "node --import tsx --test 'src/**/*.test.ts' 'src/**/*.test.mjs' && node src/cli/test-image-provenance.mjs",
     "test:fixture": "node --test test/build-fixture.test.mjs",
     "prepack": "npm run build"
   },

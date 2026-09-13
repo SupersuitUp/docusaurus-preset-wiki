@@ -117,13 +117,21 @@ async function readBack(token, { projectId, teamId }, keys) {
 
 async function applyPlan(token, project, plan, existing) {
   for (const step of plan) {
+    // A variable the 59.x CLI created is `sensitive` by default (a Secret): its value can never be
+    // read back through the API, so a length check would report it blank forever. Recreate it as
+    // `encrypted`, which is still stored encrypted at rest and IS readable to its owner.
+    const cur = existing.find((e) => e.key === step.key);
+    if (step.action === "update" && cur?.type === "sensitive") {
+      console.log(`[gate] ${step.key} was stored as sensitive (unreadable); recreating it as encrypted so it can be verified`);
+      await api(token, `/v9/projects/${project.projectId}/env/${cur.id}?teamId=${project.teamId}`, { method: "DELETE" });
+      step.action = "create";
+    }
     if (step.action === "create") {
       await api(token, `/v10/projects/${project.projectId}/env?teamId=${project.teamId}`, {
         method: "POST",
         body: JSON.stringify({ key: step.key, value: step.value, type: "encrypted", target: ["production", "preview"] }),
       });
     } else {
-      const cur = existing.find((e) => e.key === step.key);
       await api(token, `/v9/projects/${project.projectId}/env/${cur.id}?teamId=${project.teamId}`, {
         method: "PATCH",
         body: JSON.stringify({ value: step.value }),

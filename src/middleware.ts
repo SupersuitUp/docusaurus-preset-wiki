@@ -19,6 +19,7 @@
 // EDGE-SAFE: this file and src/share/* import no Node built-in. Vercel's edge bundler refuses them.
 
 import { handleShare, type ShareRequest } from './share/handleShare';
+import matcherJson from './cli/matcher.json';
 
 export { handleShare };
 export type { ShareRequest };
@@ -111,10 +112,15 @@ export function createMiddleware(opts: MiddlewareOptions = {}) {
   // 200 while the manifest itself is gated, so nothing on earth requests them
   // and the breakage is invisible from an asset check. Found live on a gated
   // wiki 2026-08-22. Any allowlist keyed on file extension has this hole.
-export const MATCHER = [
-    '/((?!assets/|img/|skills/|generators/|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|.*\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml)$).*)',
-];
+// The one string an instance has to carry itself. Vercel reads `export const config`
+// STATICALLY from the instance's middleware.ts, so a re-exported config is invisible to it
+// and the middleware runs on every path, including the og cards and the manifest the gate
+// then 401s (glory-hour-wiki, 2026-09-13, first deploy). The instance declares the literal;
+// `wiki check middleware` refuses a build whose literal has drifted from this one.
+export const MATCHER: string[] = matcherJson.matcher;
 
+/** For tests and for `wiki check middleware`. An instance must NOT re-export this; it declares
+ *  the same literal itself (see the README), because Vercel cannot see a re-export. */
 export const config = {
   matcher: MATCHER,
   runtime: 'edge' as const,

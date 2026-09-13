@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
@@ -57,6 +57,20 @@ test('check owned-files refuses a forked plugin directory', () => {
   const r = run(d, 'check', 'owned-files');
   assert.equal(r.status, 1);
   assert.match(r.stderr, /plugins/);
+});
+
+test('check middleware refuses a re-exported config and accepts the literal', () => {
+  const d = site();
+  writeFileSync(join(d, 'middleware.ts'), "export { default, config } from '@supersuit/docusaurus-preset-wiki/middleware';\n");
+  const bad = run(d, 'check', 'middleware');
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /RE-EXPORTED/);
+  const { matcher } = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'matcher.json'), 'utf8'));
+  const literal = matcher[0].replace(/\\/g, '\\\\');
+  writeFileSync(join(d, 'middleware.ts'), `export { default } from '@supersuit/docusaurus-preset-wiki/middleware';\nexport const config = { matcher: ['${literal}'], runtime: 'edge' };\n`);
+  assert.equal(run(d, 'check', 'middleware').status, 0);
+  writeFileSync(join(d, 'middleware.ts'), `export { default } from '@supersuit/docusaurus-preset-wiki/middleware';\nexport const config = { matcher: ['/((?!assets/).*)'], runtime: 'edge' };\n`);
+  assert.equal(run(d, 'check', 'middleware').status, 1);
 });
 
 test('check admonitions fails on the broken form', () => {

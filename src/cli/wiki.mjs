@@ -65,6 +65,7 @@ const CHECKS = {
     );
     return 1;
   },
+  middleware: () => node('check-middleware.mjs'),
   admonitions: () => node('check-admonitions.mjs'),
   llms: () => node('llms-txt.mjs'),
   links: () => node('check-links.mjs'),

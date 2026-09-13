@@ -14,6 +14,7 @@ carried in below under "Before the package" so the history reads in one place.
   and the framework CSS, `defineWikiConfig`, the `./middleware` entry with `createMiddleware({ gate })`,
   and the `wiki` CLI (`check`, `share`, `icons`, `optimize-images`).
 - `wiki check owned-files` refuses an instance that still carries a path the package owns.
+- `wiki check middleware`: refuses a middleware.ts that re-exports `config` or carries a matcher literal that differs from the package's. Vercel reads `config` statically, so the instance has to declare it; the first live gated deploy 401'd its own og cards and manifest before this existed.
 - `createPasswordGate()` on the `./middleware` entry: the family password gate (HMAC ticket cookie, `?key=` preloaded links, any capitalization, machine paths open, fails open with an `x-wiki-gate` header when the secret is missing), lifted from supersuit-wiki's standalone middleware so a gated wiki is `createMiddleware({ gate: createPasswordGate() })` and nothing more. Dark until `WIKI_PASSWORD` and `WIKI_GATE_SECRET` are set.
 
 ## Before the package: wiki-template v1.0.0 to v1.1.3

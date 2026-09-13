@@ -14,7 +14,7 @@ static/img/               favicon, icons, heroes
 src/css/custom.css        brand TOKENS only (:root and dark-mode variables)
 src/data/changelog-events.json   committed changelog snapshot
 docusaurus.config.ts      3 lines
-middleware.ts             1 line (open wiki)
+middleware.ts             a re-export plus the matcher literal (Vercel reads config statically)
 package.json              "prebuild": "wiki check"
 ```
 
@@ -27,7 +27,15 @@ export default defineWikiConfig(wiki);
 
 ```ts
 // middleware.ts
-export { default, config } from '@supersuit/docusaurus-preset-wiki/middleware';
+export { default } from '@supersuit/docusaurus-preset-wiki/middleware';
+// Vercel reads `config` STATICALLY from this file, so it cannot be re-exported. Copy the
+// literal; `wiki check middleware` refuses a build where it drifts from the package's.
+export const config = {
+  matcher: [
+    '/((?!assets/|img/|skills/|generators/|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|.*\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml)$).*)',
+  ],
+  runtime: 'edge',
+};
 ```
 
 Start from [`SupersuitUp/wiki-template`](https://github.com/SupersuitUp/wiki-template), which is
@@ -49,7 +57,7 @@ and an instance's own `src/theme/` still shadows both.
 | theme | `DocItem/Content` (meta row: dates + share button under the H1), `MDXComponents/A` (external links open in a new tab), `ShareButton`, `PageDates`, `Changelog`, `ChangelogWidget`, and `wiki.css` (layout, typography, components; reads the instance's tokens) |
 | `defineWikiConfig(wiki, overrides?)` | the whole Docusaurus `Config` from `wiki.config.json`: head tags for icons and manifest, robots meta and sitemap from `noindex`, classic preset options including the index-stripping sidebar generator, `themeConfig` metadata, navbar, footer, prism, colour mode |
 | `./middleware` | `createMiddleware({ gate?, secret? })`, `UNFURL_BOT_PATTERN`, `BLOCKED_BOT_PATTERN`, `MATCHER`, `config`, `handleShare`; edge-safe, no Node built-ins |
-| `wiki` CLI | `wiki check` (owned-files, admonitions, llms, links, image-weight, provenance), `wiki share`, `wiki icons`, `wiki optimize-images` |
+| `wiki` CLI | `wiki check` (owned-files, middleware, admonitions, llms, links, image-weight, provenance), `wiki share`, `wiki icons`, `wiki optimize-images` |
 
 ## Per-wiki additions
 
@@ -83,8 +91,8 @@ on the deployment and the wiki is gated; unset them and the same file is an open
 
 ```ts
 import { createMiddleware, createPasswordGate } from '@supersuit/docusaurus-preset-wiki/middleware';
-export { config } from '@supersuit/docusaurus-preset-wiki/middleware';
 export default createMiddleware({ gate: createPasswordGate() });
+export const config = { matcher: [/* the literal above */], runtime: 'edge' };
 ```
 
 A preloaded link is `<any page>?key=<password>`: it sets a thirty-day ticket cookie and lands the
@@ -96,7 +104,7 @@ door. A password with no secret fails open and says so in an `x-wiki-gate` heade
 
 ```ts
 import { createMiddleware, type GateVerdict } from '@supersuit/docusaurus-preset-wiki/middleware';
-export { config } from '@supersuit/docusaurus-preset-wiki/middleware';
+export const config = { matcher: [/* the literal above */], runtime: 'edge' };
 
 async function gate(request: Request): Promise<GateVerdict> {
   // { authorized: true } for a valid cookie.
@@ -132,6 +140,10 @@ Two things that bit while extracting this from the template, kept here so they a
 - **Register the preset AFTER `classic`.** Docusaurus resolves `@theme/<X>` against the last theme
   providing it. Listed first, theme-classic's empty `SearchBar` and original `A` win and the search
   trigger silently disappears.
+- **The instance declares `export const config` itself.** Vercel reads the middleware config
+  statically; a re-export is invisible and the middleware runs on every path, which on a gated
+  wiki 401s its own og cards and manifest. Found on the first live deploy. `wiki check
+  middleware` refuses the re-export and a drifted literal.
 - **Wrap with `@theme-init/<X>`, never `@theme-original/<X>`, inside this theme.** `@theme-original`
   is for a site's swizzle; inside a theme it resolves to the theme's own component and recurses
   until the heap dies.

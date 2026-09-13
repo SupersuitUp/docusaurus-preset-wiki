@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/@supersuit/docusaurus-preset-wiki/wiki.config.schema.json",
+  "title": "Fixture Wiki",
+  "tagline": "The smallest instance of the family preset",
+  "url": "https://fixture.example",
+  "organizationName": "SupersuitUp",
+  "projectName": "fixture-wiki",
+  "copyright": "Fixture Wiki",
+  "noindex": true,
+  "description": "A two-page wiki that exists to prove the preset builds.",
+  "og": { "bg": "#101826", "accent": "#e8a33d", "text": "#f8f5ef", "muted": "#b8c0cf" }
+}

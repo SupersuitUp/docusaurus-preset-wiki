@@ -1,0 +1,116 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Override these in your wiki's customization step. Defaults to neutral black. */
+  --ifm-color-primary: #1a1a1a;
+  --ifm-color-primary-dark: #171717;
+  --ifm-color-primary-darker: #141414;
+  --ifm-color-primary-darkest: #0a0a0a;
+  --ifm-color-primary-light: #2a2a2a;
+  --ifm-color-primary-lighter: #333333;
+  --ifm-color-primary-lightest: #4a4a4a;
+
+  --ifm-background-color: #fafaf8;
+  --ifm-background-surface-color: #fafaf8;
+  --ifm-font-color-base: #1a1a1a;
+  --ifm-font-color-secondary: #555;
+
+  --ifm-font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --ifm-heading-font-family: 'Geist Mono', ui-monospace, monospace;
+  --ifm-font-family-monospace: 'Geist Mono', ui-monospace, monospace;
+
+  --ifm-h1-font-size: 2.5rem;
+  --ifm-h2-font-size: 1.65rem;
+  --ifm-h3-font-size: 1.25rem;
+  --ifm-h4-font-size: 1.05rem;
+
+  --ifm-line-height-base: 1.7;
+  --ifm-leading: 1.7;
+  --ifm-paragraph-margin-bottom: 1.35rem;
+  --ifm-list-margin: 1.35rem;
+
+  --ifm-code-font-size: 90%;
+  --ifm-navbar-background-color: #fafaf8;
+  --ifm-footer-background-color: #fafaf8;
+  --ifm-footer-color: #1a1a1a;
+  --ifm-toc-border-color: transparent;
+
+  --ifm-spacing-horizontal: 1.25rem;
+}
+
+
+/* ============================
+   Dark mode
+   ============================ */
+
+[data-theme='dark'] {
+  --ifm-color-primary: #d4d4d4;
+  --ifm-color-primary-dark: #c0c0c0;
+  --ifm-color-primary-darker: #b0b0b0;
+  --ifm-color-primary-darkest: #999999;
+  --ifm-color-primary-light: #e0e0e0;
+  --ifm-color-primary-lighter: #e8e8e8;
+  --ifm-color-primary-lightest: #f0f0f0;
+
+  --ifm-background-color: #111111;
+  --ifm-background-surface-color: #111111;
+  --ifm-font-color-base: #e8e8e8;
+  --ifm-font-color-secondary: #a0a0a0;
+  --ifm-navbar-background-color: #111111;
+  --ifm-footer-background-color: #111111;
+  --ifm-footer-color: #e8e8e8;
+}
+
+[data-theme='dark'] .markdown {
+  color: #e8e8e8;
+}
+
+[data-theme='dark'] .markdown h1,
+[data-theme='dark'] .markdown h2,
+[data-theme='dark'] .markdown h3,
+[data-theme='dark'] .markdown h4 {
+  color: #f0f0f0;
+}
+
+[data-theme='dark'] .markdown h1 + p > em:only-child,
+[data-theme='dark'] .markdown h1 + p em:first-child:last-child,
+[data-theme='dark'] .markdown h1 + p:has(> em:only-child) {
+  color: #a0a0a0;
+}
+
+[data-theme='dark'] .markdown blockquote {
+  color: #b0b0b0;
+}
+
+[data-theme='dark'] .markdown a {
+  text-decoration-color: rgba(212, 212, 212, 0.35);
+}
+
+[data-theme='dark'] .markdown code:not(pre code) {
+  background: rgba(212, 212, 212, 0.08);
+  color: #d4d4d4;
+}
+
+[data-theme='dark'] .menu__link {
+  color: #b0b0b0;
+}
+
+[data-theme='dark'] .menu__link:hover {
+  background: rgba(212, 212, 212, 0.08);
+}
+
+[data-theme='dark'] .menu__link--active {
+  background: rgba(212, 212, 212, 0.1);
+}
+
+[data-theme='dark'] .menu__link--sublist {
+  color: #e0e0e0;
+}
+
+[data-theme='dark'] .table-of-contents__link {
+  color: #888;
+}
+
+[data-theme='dark'] .footer {
+  color: #888;
+}

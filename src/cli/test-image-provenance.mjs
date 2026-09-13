@@ -67,6 +67,28 @@ t("the generate_image dialect (inputs + generatedAt + asset) passes", () => {
   rmSync(root, { recursive: true, force: true });
 });
 
+t("a COMPOSITE recipe (panelRecipes each complete, plus a compositor) passes", () => {
+  const part = { provider: "gpt-image-2", model: "gpt-image-2", prompt: "a panel", refs: [], timestamp: "2026-09-13T00:00:00Z" };
+  const composite = { asset: "static/img/hero.png", compositor: "illustrations/compose.py", panelRecipes: { P1: part, P2: part, P3: part } };
+  const root = wiki({ "static/img/hero.png": PNG, "static/img/hero.png.recipe.json": composite });
+  const r = run(root);
+  if (r.code !== 0) throw new Error(`a correct composite recipe was refused:\n${r.out}`);
+  rmSync(root, { recursive: true, force: true });
+});
+
+t("a composite whose part lacks a prompt, or which names no compositor, is refused and the part is named", () => {
+  const good = { provider: "gpt-image-2", model: "gpt-image-2", prompt: "a panel", refs: [], timestamp: "2026-09-13T00:00:00Z" };
+  const bad = { provider: "gpt-image-2", model: "gpt-image-2", refs: [], timestamp: "2026-09-13T00:00:00Z" };
+  const root = wiki({ "static/img/hero.png": PNG, "static/img/hero.png.recipe.json": { compositor: "x.py", panelRecipes: { P1: good, P2: bad } } });
+  const r = run(root);
+  if (r.code === 0 || !/part P2: no `prompt`/.test(r.out)) throw new Error(`a part with no prompt got through:\n${r.out}`);
+  rmSync(root, { recursive: true, force: true });
+  const root2 = wiki({ "static/img/hero.png": PNG, "static/img/hero.png.recipe.json": { panelRecipes: { P1: good } } });
+  const r2 = run(root2);
+  if (r2.code === 0 || !/no `compositor`/.test(r2.out)) throw new Error(`a composite with no compositor got through:\n${r2.out}`);
+  rmSync(root2, { recursive: true, force: true });
+});
+
 t("an image with NO recipe is refused", () => {
   const root = wiki({ "static/img/hero.png": PNG });
   const r = run(root);

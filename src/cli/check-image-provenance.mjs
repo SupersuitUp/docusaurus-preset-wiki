@@ -120,6 +120,22 @@ export function validateRecipe(recipe, relAsset) {
 
   const mode = recipe.mode ?? (recipe.derivedFrom ? "derive" : null);
 
+  // A COMPOSITE: several generated parts assembled by a compositor that draws the typography in
+  // code (pcs.wiki's register, where every string is exact by construction). Its provenance is
+  // the provenance of each part plus the name of what assembled them, so the check recurses:
+  // each entry of `panelRecipes` (or `parts`) must pass on its own, and `compositor` (or
+  // `generator`) must be named. Before this branch the gate read a recipe-of-recipes as a flat
+  // one with no model and no prompt and called three correct sidecars invalid (2026-09-13).
+  const parts = recipe.panelRecipes ?? recipe.parts;
+  if (parts && typeof parts === "object" && !Array.isArray(parts) && Object.keys(parts).length) {
+    if (!first("compositor", "generator")) problems.push("a composite with no `compositor` (or `generator`) naming what assembled the parts");
+    for (const [name, part] of Object.entries(parts)) {
+      if (!part || typeof part !== "object") { problems.push(`part ${name} is not a recipe`); continue; }
+      for (const pr of validateRecipe(part, relAsset)) problems.push(`part ${name}: ${pr}`);
+    }
+    return problems;
+  }
+
   if (mode === "derive") {
     // A transform ran and no model did. It must name what it came from, or the chain back to a
     // generation is broken and the sidecar documents nothing.

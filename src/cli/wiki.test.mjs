@@ -44,6 +44,13 @@ test('check passes on a clean minimal site and writes llms.txt', () => {
   assert.equal(spawnSync('test', ['-f', join(d, 'static', 'llms.txt')]).status, 0);
 });
 
+test('check owned-files allows an instance plugin and a swizzle', () => {
+  const d = site();
+  mkdirSync(join(d, 'plugins', 'chat-plugin'), { recursive: true });
+  mkdirSync(join(d, 'src', 'theme', 'Footer'), { recursive: true });
+  assert.equal(run(d, 'check', 'owned-files').status, 0);
+});
+
 test('check owned-files refuses a forked plugin directory', () => {
   const d = site();
   mkdirSync(join(d, 'plugins', 'search-plugin'), { recursive: true });

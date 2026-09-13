@@ -57,7 +57,7 @@ and an instance's own `src/theme/` still shadows both.
 | theme | `DocItem/Content` (meta row: dates + share button under the H1), `MDXComponents/A` (external links open in a new tab), `ShareButton`, `PageDates`, `Changelog`, `ChangelogWidget`, and `wiki.css` (layout, typography, components; reads the instance's tokens) |
 | `defineWikiConfig(wiki, overrides?)` | the whole Docusaurus `Config` from `wiki.config.json`: head tags for icons and manifest, robots meta and sitemap from `noindex`, classic preset options including the index-stripping sidebar generator, `themeConfig` metadata, navbar, footer, prism, colour mode |
 | `./middleware` | `createMiddleware({ gate?, secret? })`, `UNFURL_BOT_PATTERN`, `BLOCKED_BOT_PATTERN`, `MATCHER`, `config`, `handleShare`; edge-safe, no Node built-ins |
-| `wiki` CLI | `wiki check` (owned-files, middleware, admonitions, llms, links, image-weight, provenance), `wiki share`, `wiki icons`, `wiki optimize-images` |
+| `wiki` CLI | `wiki check` (owned-files, middleware, admonitions, llms, links, image-weight, provenance), `wiki gate set\|status\|link` (the deployed gate, through the Vercel API with read-back, redeploy and live checks), `wiki share`, `wiki icons`, `wiki optimize-images` |
 
 ## Per-wiki additions
 
@@ -93,6 +93,14 @@ on the deployment and the wiki is gated; unset them and the same file is an open
 import { createMiddleware, createPasswordGate } from '@supersuit/docusaurus-preset-wiki/middleware';
 export default createMiddleware({ gate: createPasswordGate() });
 export const config = { matcher: [/* the literal above */], runtime: 'edge' };
+```
+
+Set it from the wiki root after `vercel link`, never by hand:
+
+```bash
+wiki gate set --password "the word"      # mints the secrets, reads back, redeploys, checks live
+wiki gate link /some/page --password "the word"
+wiki gate set --rotate-secrets           # every ticket and share link ever issued stops working
 ```
 
 A preloaded link is `<any page>?key=<password>`: it sets a thirty-day ticket cookie and lands the

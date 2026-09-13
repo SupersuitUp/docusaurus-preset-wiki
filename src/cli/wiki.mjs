@@ -79,6 +79,8 @@ function help() {
   check [${Object.keys(CHECKS).join('|')}]
                        run one build-time check, or all of them in that order (the prebuild)
   share [...]          the unlock-link CLI: OPEN / UNLOCKED / BLOCKED / MINTABLE, focused shares
+  gate set|status|link the password gate of the deployed wiki: set or rotate it through the Vercel API,
+                       verify by read-back, redeploy, check the live site (wiki gate --help)
   icons                draw the favicon and PWA icon set from wiki.config.json (python3 + Pillow)
   optimize-images      WebP-convert and resize static images (python3 + Pillow)
 
@@ -111,6 +113,9 @@ switch (cmd) {
   }
   case 'share':
     status = node('unlock-link.mjs', ...rest);
+    break;
+  case 'gate':
+    status = node('gate.mjs', ...rest);
     break;
   case 'icons':
     status = python('build-icons.py', ...rest);

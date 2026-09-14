@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defineWikiConfig } from './define-config';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const wiki = {
   title: 'T', tagline: 'tag', url: 'https://t.wiki', organizationName: 'o', projectName: 'p',
@@ -51,4 +54,21 @@ test('top-level overrides replace their key', () => {
   const c = defineWikiConfig(wiki, { onBrokenLinks: 'warn' });
   assert.equal(c.onBrokenLinks, 'warn');
   assert.equal(c.title, 'T');
+});
+
+test('icon links are declared only for icon files that exist under static/img', () => {
+  const none = mkdtempSync(join(tmpdir(), 'wiki-noicons-'));
+  const some = mkdtempSync(join(tmpdir(), 'wiki-icons-'));
+  try {
+    mkdirSync(join(some, 'static', 'img'), { recursive: true });
+    writeFileSync(join(some, 'static', 'img', 'icon-192.png'), 'x');
+    writeFileSync(join(some, 'static', 'img', 'apple-touch-icon.png'), 'x');
+    const hrefs = (dir: string) => (defineWikiConfig(wiki, { siteDir: dir }).headTags as any[])
+      .filter((t) => t.tagName === 'link').map((t) => t.attributes.href);
+    // No icons yet: the manifest link stays (the plugin writes the file at build time),
+    // the three icon links go, so a fresh wiki ships no <link> to a 404.
+    assert.deepEqual(hrefs(none), ['/manifest.webmanifest']);
+    // Two of three present: exactly those two are declared.
+    assert.deepEqual(hrefs(some), ['/img/apple-touch-icon.png', '/img/icon-192.png', '/manifest.webmanifest']);
+  } finally { rmSync(none, { recursive: true, force: true }); rmSync(some, { recursive: true, force: true }); }
 });

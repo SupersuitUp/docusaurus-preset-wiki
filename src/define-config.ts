@@ -1,9 +1,15 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { themes as prismThemes } from 'prism-react-renderer';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 import type { WikiConfig } from './config';
 
-type Overrides = Partial<Omit<Config, 'themeConfig'>> & { themeConfig?: Record<string, unknown> };
+type Overrides = Partial<Omit<Config, 'themeConfig'>> & {
+  themeConfig?: Record<string, unknown>;
+  /** The site root, for the icon existence checks. Defaults to the working directory, which is where Docusaurus reads the config. Tests pass it. */
+  siteDir?: string;
+};
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -27,7 +33,10 @@ function deepMerge<T extends Record<string, unknown>>(base: T, over: Record<stri
  * key replaces its default.
  */
 export function defineWikiConfig(wiki: WikiConfig, overrides: Overrides = {}): Config {
-  const { themeConfig: themeOverrides, ...configOverrides } = overrides;
+  const { themeConfig: themeOverrides, siteDir, ...configOverrides } = overrides;
+  // Docusaurus reads the config from the site root, so that is where `static/` is.
+  const root = siteDir ?? process.cwd();
+  const hasStatic = (rel: string) => fs.existsSync(path.join(root, 'static', rel));
 
   const base: Config = {
     title: wiki.title,
@@ -67,9 +76,21 @@ export function defineWikiConfig(wiki: WikiConfig, overrides: Overrides = {}): C
       // screen or an install prompt needs is declared here. The manifest is
       // written at build time by the manifest plugin, and the edge gate has to
       // exempt `.webmanifest` separately from `.json`: see the middleware matcher.
-      { tagName: 'link', attributes: { rel: 'apple-touch-icon', sizes: '180x180', href: '/img/apple-touch-icon.png' } },
-      { tagName: 'link', attributes: { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/img/icon-192.png' } },
-      { tagName: 'link', attributes: { rel: 'icon', type: 'image/png', sizes: '512x512', href: '/img/icon-512.png' } },
+      //
+      // Each icon link is declared only when its file exists under static/img, the
+      // same rule the manifest plugin applies to its own entries. A wiki that has not
+      // run `wiki icons` yet otherwise ships three <link>s to 404s on every page, which
+      // the first migration onto the package (pcs-wiki, 2026-09-13) surfaced as the only
+      // difference in an otherwise identical build.
+      ...(hasStatic('img/apple-touch-icon.png')
+        ? [{ tagName: 'link', attributes: { rel: 'apple-touch-icon', sizes: '180x180', href: '/img/apple-touch-icon.png' } }]
+        : []),
+      ...(hasStatic('img/icon-192.png')
+        ? [{ tagName: 'link', attributes: { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/img/icon-192.png' } }]
+        : []),
+      ...(hasStatic('img/icon-512.png')
+        ? [{ tagName: 'link', attributes: { rel: 'icon', type: 'image/png', sizes: '512x512', href: '/img/icon-512.png' } }]
+        : []),
       { tagName: 'link', attributes: { rel: 'manifest', href: '/manifest.webmanifest' } },
       { tagName: 'meta', attributes: { name: 'theme-color', content: wiki.og?.bg ?? '#ffffff' } },
       ...(wiki.noindex

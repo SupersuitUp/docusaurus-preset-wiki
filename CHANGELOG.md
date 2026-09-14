@@ -5,6 +5,10 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.1.1 (2026-09-13)
+
+- `defineWikiConfig` declares the `apple-touch-icon`, `icon-192` and `icon-512` `<link>`s only when the file exists under `static/img`, the rule the manifest plugin already applied to its own entries. A wiki that has not run `wiki icons` otherwise shipped three links to 404s on every page; the first migration onto the package (pcs-wiki) surfaced it as the only difference in an otherwise identical build. `overrides.siteDir` sets the root the check reads (tests pass it; Docusaurus reads the config from the site root, so the default is the working directory).
+
 ## 1.1.0 (2026-09-13)
 
 - `wiki check provenance` accepts a COMPOSITE recipe: `panelRecipes` (or `parts`) each validated on their own plus a `compositor`. pcs.wiki's code-lettered heroes are this shape and the flat check called three correct sidecars invalid.

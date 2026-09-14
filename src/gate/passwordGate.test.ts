@@ -65,6 +65,48 @@ test('machine paths and unfurl bots pass the gate; training crawlers never reach
   assert.equal((await mw(req('https://t.wiki/the-argument/shame', { ua: 'GPTBot' })))?.status, 403);
 });
 
+// --- machinePaths: 'gated' ---------------------------------------------------------------
+//
+// Open machine paths are right for a public-knowledge wiki whose agents and players cannot
+// answer a door. On a PRIVATE one they publish the entire wiki: `/llms-full.txt` is every page
+// in one file and it matched the open pattern, so a wiki the operator had gated served its full
+// text to anyone who guessed the filename. Reported by @brayantenesaca10-boop (freedom#122),
+// found on a wiki registered `audience: private` with the gate on.
+
+const gatedMachine = () => createMiddleware({
+  gate: createPasswordGate({ password: 'Glory Hour', secret: 'test-secret', machinePaths: 'gated' }),
+  secret: 'test-secret',
+});
+
+test("machinePaths: 'gated' puts the whole text behind the door, llms-full.txt included", async () => {
+  const mw = gatedMachine();
+  for (const path of ['/llms-full.txt', '/llms.txt', '/the-argument/shame.md', '/talks/one.mp3']) {
+    const res = await mw(req(`https://t.wiki${path}`));
+    assert.equal(res?.status, 401, `${path} must meet the door on a private wiki`);
+  }
+});
+
+test("machinePaths: 'gated' still serves hosted skills and generators, which are instructions", async () => {
+  // An agent following a wiki's intake skill has to be able to FETCH it before it has a key,
+  // and the skill file is a procedure rather than the wiki's content.
+  const mw = gatedMachine();
+  assert.equal(await mw(req('https://t.wiki/skills/x-intake/SKILL.md')), undefined);
+  assert.equal(await mw(req('https://t.wiki/generators/y/gen.mjs')), undefined);
+});
+
+test("machinePaths: 'gated' opens the text to a key, so an agent with the password still reads it", async () => {
+  const mw = gatedMachine();
+  const res = await mw(req('https://t.wiki/llms-full.txt?key=glory%20hour'));
+  assert.equal(res?.status, 303);
+  assert.equal(res!.headers.get('location'), '/llms-full.txt');
+  const cookie = cookieOf(res!);
+  assert.equal(await mw(req('https://t.wiki/llms-full.txt', { cookie })), undefined);
+});
+
+test("machinePaths defaults to 'open', so no wiki already deployed changes behaviour", async () => {
+  assert.equal(await gated()(req('https://t.wiki/llms-full.txt')), undefined);
+});
+
 test('a ticketed reader can mint a share link; an anonymous one cannot; the share serves the mirror', async () => {
   const mw = gated();
   const cookie = cookieOf((await mw(req('https://t.wiki/x?key=glory%20hour')))!);

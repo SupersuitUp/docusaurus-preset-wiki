@@ -35,6 +35,24 @@ export interface PasswordGateOptions {
   maxAgeSeconds?: number;
   /** Shown on the door. Defaults to the request host. */
   title?: string;
+  /**
+   * What the gate does with machine paths (`.md`, `.txt`, audio, video, `.pdf`, `/llms.txt`).
+   *
+   * `'open'`, the default, keeps them readable with the gate on, so hosted skills, llms.txt
+   * and audio keep working for agents and players that cannot answer a door. That is right
+   * for a public-knowledge wiki and WRONG for a private one, where `/llms-full.txt` is every
+   * page of the wiki in a single file: a wiki registered `audience: private` served its
+   * entire text to anyone who guessed that filename, and nothing about the door said so
+   * (freedom#122, @brayantenesaca10-boop).
+   *
+   * `'gated'` puts them behind the same door and the same `?key=` link as every page. Hosted
+   * skills and generators stay open either way, because an agent has to be able to fetch the
+   * instructions it is about to follow, and those are a procedure rather than the content.
+   *
+   * The default is `'open'` so that no wiki already deployed changes behaviour on upgrade.
+   * Any wiki whose content is not meant to be public wants `'gated'`.
+   */
+  machinePaths?: 'open' | 'gated';
 }
 
 declare const process: { env: Record<string, string | undefined> };
@@ -44,9 +62,14 @@ const COOKIE_VERSION = 'v1';
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 30;
 
 // Machine paths stay open with the gate on, so hosted skills, llms.txt and audio keep
-// working for agents and players that cannot answer a door.
+// working for agents and players that cannot answer a door. See `machinePaths` above: on a
+// wiki whose content is private this pattern is what published it, because `/llms-full.txt`
+// is the whole wiki in one `.txt`.
 const MACHINE_PATH_PATTERN = /\.(?:md|txt|mp3|mp4|m4a|wav|pdf)$/i;
 const MACHINE_PREFIX_PATTERN = /^\/(llms\.txt|skills\/|generators\/)/;
+// Open at BOTH settings: instructions an agent must fetch before it can hold a key, and the
+// generators those instructions run. Never the wiki's own pages or text.
+const ALWAYS_OPEN_PREFIX_PATTERN = /^\/(skills\/|generators\/)/;
 
 const encoder = new TextEncoder();
 
@@ -194,7 +217,9 @@ export function createPasswordGate(opts: PasswordGateOptions = {}): GateFn | und
     if (!password) return { authorized: true };
     if (!secret) return { authorized: false, response: passThroughWithWarning('gate-misconfigured-no-secret') };
 
-    if (MACHINE_PATH_PATTERN.test(url.pathname) || MACHINE_PREFIX_PATTERN.test(url.pathname)) {
+    const machineOpen = (opts.machinePaths ?? 'open') === 'open';
+    const openPattern = machineOpen ? MACHINE_PREFIX_PATTERN : ALWAYS_OPEN_PREFIX_PATTERN;
+    if ((machineOpen && MACHINE_PATH_PATTERN.test(url.pathname)) || openPattern.test(url.pathname)) {
       return { authorized: true };
     }
 

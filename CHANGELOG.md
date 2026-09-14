@@ -5,6 +5,10 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.2.0 (2026-09-14)
+
+- `createPasswordGate` takes `machinePaths: 'open' | 'gated'`. Open is the default and is unchanged, so no deployed wiki behaves differently on upgrade. `'gated'` puts `.md`, `.txt`, audio, video, `.pdf` and `/llms.txt` behind the same door and the same `?key=` link as every page, leaving `/skills/` and `/generators/` open at both settings because an agent has to fetch the instructions it is about to follow before it can hold a key. Open machine paths are right for a public-knowledge wiki whose agents and players cannot answer a door, and on a private one they publish everything: `/llms-full.txt` is every page in a single `.txt`, so a wiki registered `audience: private` with the gate on served its entire text to anyone who guessed that filename. Reported by @brayantenesaca10-boop against a real private wiki (ContinentalWorks/freedom#122). Any wiki whose content is not meant to be public wants `'gated'`.
+
 ## 1.1.1 (2026-09-13)
 
 - `defineWikiConfig` declares the `apple-touch-icon`, `icon-192` and `icon-512` `<link>`s only when the file exists under `static/img`, the rule the manifest plugin already applied to its own entries. A wiki that has not run `wiki icons` otherwise shipped three links to 404s on every page; the first migration onto the package (pcs-wiki) surfaced it as the only difference in an otherwise identical build. `overrides.siteDir` sets the root the check reads (tests pass it; Docusaurus reads the config from the site root, so the default is the working directory).

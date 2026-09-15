@@ -1,0 +1,49 @@
+/* One asset, both themes. Everything inherits the page's text colour through currentColor, so
+   the only value that needs a per-theme override is the accent: the terracotta that reads on a
+   cream background is muddy on a near-black one. */
+.figure {
+  margin: 2rem 0;
+  --loop-accent: #80412a;
+}
+
+:global([data-theme='dark']) .figure {
+  --loop-accent: #d98f6f;
+}
+
+/* One layout at a time. A wide ring squeezed into a phone column renders its labels at about six
+   CSS pixels, which is a diagram nobody can read pretending to be responsive, so below the
+   breakpoint the stacked version shows instead. A media query rather than JavaScript, so there
+   is no flash and the first paint is already correct. */
+.ring,
+.column {
+  display: block;
+  height: auto;
+  margin: 0 auto;
+}
+
+.ring {
+  width: 100%;
+}
+
+.column {
+  display: none;
+  width: 100%;
+  max-width: 340px;
+}
+
+@media (max-width: 700px) {
+  .ring {
+    display: none;
+  }
+  .column {
+    display: block;
+  }
+}
+
+.caption {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  opacity: 0.72;
+  text-align: center;
+}

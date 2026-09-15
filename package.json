@@ -19,7 +19,11 @@
       "default": "./lib/middleware.js"
     },
     "./wiki.config.schema.json": "./wiki.config.schema.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./figures": {
+      "types": "./lib/figures/index.d.ts",
+      "default": "./lib/figures/index.js"
+    }
   },
   "bin": {
     "wiki": "lib/cli/wiki.mjs"

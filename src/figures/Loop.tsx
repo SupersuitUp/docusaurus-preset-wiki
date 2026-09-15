@@ -1,6 +1,7 @@
 import React, {type JSX} from 'react';
 import styles from './Loop.module.css';
 import {loopLabel} from './loop-label';
+import {wrapLabel, NODE_MAX_W, NODE_PAD, CHAR_W} from './wrap-label';
 
 // A cycle, DRAWN. The answer `wiki check ascii-diagrams` points at when it refuses a typed one.
 //
@@ -39,9 +40,9 @@ const CY = H / 2;
 const RX = 288;
 const RY = 148;
 
-const NODE_H = 52;
-const NODE_PAD = 26;
-const CHAR_W = 8.1; // 15px system sans, measured against a long label
+const NODE_LINE_H = 20;
+const NODE_MIN_H = 52;
+
 
 const rad = (deg: number) => ((deg - 90) * Math.PI) / 180;
 const pointAt = (deg: number) => ({x: CX + RX * Math.cos(rad(deg)), y: CY + RY * Math.sin(rad(deg))});
@@ -84,31 +85,37 @@ function Ring({beats, middle, label}: {beats: readonly string[]; middle: readonl
 
       {beats.map((text, i) => {
         const {x, y} = pointAt(i * step);
-        const w = text.length * CHAR_W + NODE_PAD * 2;
+        const lines = wrapLabel(text);
+        const longest = Math.max(...lines.map((l) => l.length));
+        const w = longest * CHAR_W + NODE_PAD * 2;
+        const h = Math.max(NODE_MIN_H, lines.length * NODE_LINE_H + 24);
         return (
           <g key={text}>
             <rect
               x={x - w / 2}
-              y={y - NODE_H / 2}
+              y={y - h / 2}
               width={w}
-              height={NODE_H}
+              height={h}
               rx={8}
               fill="var(--ifm-background-color)"
               stroke="currentColor"
               strokeOpacity={0.85}
               strokeWidth={1.5}
             />
-            <text
-              x={x}
-              y={y}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fill="currentColor"
-              fontSize={15}
-              fontFamily="var(--ifm-font-family-base)"
-            >
-              {text}
-            </text>
+            {lines.map((line, li) => (
+              <text
+                key={line}
+                x={x}
+                y={y - ((lines.length - 1) * NODE_LINE_H) / 2 + li * NODE_LINE_H}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="currentColor"
+                fontSize={15}
+                fontFamily="var(--ifm-font-family-base)"
+              >
+                {line}
+              </text>
+            ))}
           </g>
         );
       })}
@@ -134,19 +141,30 @@ function Ring({beats, middle, label}: {beats: readonly string[]; middle: readonl
 /* ------------------------------------------------------- the stacked column, for phone widths */
 
 const CW = 340;
-const COL_NODE_H = 46;
+const COL_LINE_H = 19;
 const COL_GAP = 40;
 const COL_TOP = 12;
 const COL_X = 96; // leaves room on the left for the return arc
 const COL_NODE_W = CW - COL_X - 12;
-const COL_STEP = COL_NODE_H + COL_GAP;
 
 function Column({beats, middle, label}: {beats: readonly string[]; middle: readonly string[]; label: string}) {
   const midX = COL_X + COL_NODE_W / 2;
-  const top = (i: number) => COL_TOP + i * COL_STEP;
-  const firstMid = top(0) + COL_NODE_H / 2;
-  const lastMid = top(beats.length - 1) + COL_NODE_H / 2;
-  const closerY = top(beats.length - 1) + COL_NODE_H + 30;
+  // Each node is as tall as its own wrapped label, so the stack is laid out by accumulating
+  // heights rather than by one fixed step. A two-line beat otherwise overflows its box, which is
+  // the same clipping bug as the ring's, just harder to see on a phone.
+  const wrapped = beats.map((t) => wrapLabel(t, COL_NODE_W + NODE_PAD * 2 - 24, 3));
+  const heights = wrapped.map((lines) => Math.max(40, lines.length * COL_LINE_H + 20));
+  const tops: number[] = [];
+  let cursor = COL_TOP;
+  for (const h of heights) {
+    tops.push(cursor);
+    cursor += h + COL_GAP;
+  }
+  const top = (i: number) => tops[i];
+  const firstMid = top(0) + heights[0] / 2;
+  const last = beats.length - 1;
+  const lastMid = top(last) + heights[last] / 2;
+  const closerY = top(last) + heights[last] + 30;
   const height = closerY + (middle.length ? 30 + middle.length * 20 : 0) + 12;
   const returnX = 30;
 
@@ -156,7 +174,7 @@ function Column({beats, middle, label}: {beats: readonly string[]; middle: reado
         <g key={`link-${text}`}>
           <line
             x1={midX}
-            y1={top(i) + COL_NODE_H}
+            y1={top(i) + heights[i]}
             x2={midX}
             y2={top(i + 1) - 9}
             stroke="currentColor"
@@ -177,32 +195,39 @@ function Column({beats, middle, label}: {beats: readonly string[]; middle: reado
       />
       <polygon points={arrowPoints(COL_X - 9, firstMid, 1, 0)} fill="var(--loop-accent)" />
 
-      {beats.map((text, i) => (
-        <g key={text}>
-          <rect
-            x={COL_X}
-            y={top(i)}
-            width={COL_NODE_W}
-            height={COL_NODE_H}
-            rx={8}
-            fill="var(--ifm-background-color)"
-            stroke="currentColor"
-            strokeOpacity={0.85}
-            strokeWidth={1.5}
-          />
-          <text
-            x={midX}
-            y={top(i) + COL_NODE_H / 2}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fill="currentColor"
-            fontSize={15}
-            fontFamily="var(--ifm-font-family-base)"
-          >
-            {text}
-          </text>
-        </g>
-      ))}
+      {beats.map((text, i) => {
+        const lines = wrapped[i];
+        const mid = top(i) + heights[i] / 2;
+        return (
+          <g key={text}>
+            <rect
+              x={COL_X}
+              y={top(i)}
+              width={COL_NODE_W}
+              height={heights[i]}
+              rx={8}
+              fill="var(--ifm-background-color)"
+              stroke="currentColor"
+              strokeOpacity={0.85}
+              strokeWidth={1.5}
+            />
+            {lines.map((line, li) => (
+              <text
+                key={line}
+                x={midX}
+                y={mid - ((lines.length - 1) * COL_LINE_H) / 2 + li * COL_LINE_H}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="currentColor"
+                fontSize={15}
+                fontFamily="var(--ifm-font-family-base)"
+              >
+                {line}
+              </text>
+            ))}
+          </g>
+        );
+      })}
 
       {middle.map((line, i) => (
         <text

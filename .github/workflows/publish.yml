@@ -45,10 +45,26 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # NO `registry-url` HERE, AND THAT IS THE WHOLE TRICK.
+      #
+      # Every published example of this workflow sets `registry-url: https://registry.npmjs.org`,
+      # and with OIDC it is the thing that breaks the publish. setup-node responds to that
+      # option by writing an .npmrc containing
+      #     //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
+      # and exporting NODE_AUTH_TOKEN as a placeholder. npm finds a credential already
+      # configured, so it never attempts the OIDC exchange, sends the placeholder instead, and
+      # the registry rejects it.
+      #
+      # The rejection is a 404 rather than a 401, because npm answers an unauthenticated PUT
+      # with "not found" so that private package names cannot be probed. So the failure reads
+      # as "the package does not exist" for a package that plainly does, and says nothing
+      # about auth at all. Cost one release on 2026-09-15 (run 34978380965).
+      #
+      # Omitting it leaves npm with no configured credential, which is the state that makes it
+      # perform the OIDC exchange. The default registry is already registry.npmjs.org.
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
 
       # OIDC trusted publishing landed in npm 11.5.1. setup-node ships whatever npm came
       # with the Node build, so pin it rather than hoping. An older npm fails by asking
@@ -95,10 +111,20 @@ jobs:
 
       - name: Publish
         if: github.event_name == 'push' || inputs.dry_run == false
-        # No NODE_AUTH_TOKEN and no .npmrc auth line. The OIDC identity above is the
-        # entire credential; adding a token here would silently take precedence over it
-        # and put the 2FA prompt back.
-        run: npm publish
+        # No NODE_AUTH_TOKEN and no .npmrc auth line, which is enforced by the absence of
+        # `registry-url` above rather than by anything here. The OIDC identity is the entire
+        # credential; ANY configured token takes precedence over it and puts the 2FA prompt
+        # back, or fails as an unexplained 404.
+        #
+        # The assertion below is cheap and catches the regression directly, because the
+        # symptom is otherwise indistinguishable from a missing package.
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN:-}" ] || grep -qs "_authToken" "${NPM_CONFIG_USERCONFIG:-/dev/null}"; then
+            echo "A credential is configured, so npm will not attempt the OIDC exchange."
+            echo "Check that setup-node above does not set registry-url."
+            exit 1
+          fi
+          npm publish
 
       - name: Dry run only
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run

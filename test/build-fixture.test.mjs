@@ -78,6 +78,17 @@ test('a fixture instance builds from the package and emits every framework outpu
   assert.match(cssText, /doc-meta-slot|\.markdown h1\s*\+\s*p/, 'framework wiki.css bundled');
   assert.match(cssText, /--ifm-color-primary/, 'instance brand tokens bundled');
 
+  // A blockquote's inner <p> keeps the `.markdown p` bottom margin, and that margin sits
+  // INSIDE the left rule, hanging a phantom blank line off the end of every quote
+  // (measured 2026-09-15: 4px above the text, 25.6px below, against a 27.2px line).
+  // The reset is easy to drop silently, because nothing fails when it goes -- the quote
+  // just sags again. Assert it survives minification into the shipped bundle.
+  assert.match(
+    cssText,
+    /blockquote\s*>\s*:last-child\s*\{[^}]*margin-bottom:\s*0/,
+    'blockquote last-child margin reset bundled (no phantom trailing line)',
+  );
+
   const changelog = JSON.parse(readFileSync(join(site, 'src', 'data', 'changelog-events.json'), 'utf8'));
   assert.ok(changelog.changeEvents.some((e) => e.docKey === 'concepts/alpha' && e.type === 'new'), 'changelog snapshot written from git');
 

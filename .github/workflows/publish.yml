@@ -66,13 +66,31 @@ jobs:
         with:
           node-version: 24
 
-      # OIDC trusted publishing landed in npm 11.5.1. setup-node ships whatever npm came
-      # with the Node build, so pin it rather than hoping. An older npm fails by asking
-      # for a token, which reads like a credential problem and is not one.
-      - name: Ensure npm supports trusted publishing
+      # PINNED TO 11.x, NOT `npm@latest`.
+      #
+      # OIDC trusted publishing landed in npm 11.5.1. Writing `npm@latest` here picked up
+      # npm 12.0.2 on 2026-09-15, which did not perform the exchange at all: it went straight
+      # to ENEEDAUTH, "you need to authorize this machine using npm login", as though trusted
+      # publishing did not exist. Reaching for the newest npm to be safe is what broke it.
+      #
+      # Raise this deliberately, after checking that the new major still does the exchange,
+      # rather than by floating it.
+      - name: Pin npm to a version that performs the OIDC exchange
         run: |
-          npm install -g npm@latest
+          npm install -g npm@11
           npm --version
+
+      # The exchange needs these two, injected by GitHub only when `id-token: write` is set
+      # above. Asserting them here turns a silent auth failure at the end of a five-minute
+      # run into an immediate, named one.
+      - name: Assert the OIDC identity is available
+        run: |
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "No OIDC identity available to this job."
+            echo "The workflow needs `permissions: id-token: write`, and a fork PR never gets one."
+            exit 1
+          fi
+          echo "OIDC identity present"
 
       - run: npm ci
 

@@ -42,6 +42,12 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # MUST MATCH the "Environment name" on npm's trusted-publisher record for this package.
+    # npm checks the environment claim inside the OIDC token, so a record naming an
+    # environment the job does not declare fails as ENEEDAUTH, with nothing said about
+    # environments. Recorded as `blank` on 2026-09-15 because that word was typed into the
+    # field rather than the field being left empty. Renaming it means editing both sides.
+    environment: blank
     steps:
       - uses: actions/checkout@v5
 

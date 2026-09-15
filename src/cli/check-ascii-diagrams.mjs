@@ -39,13 +39,32 @@ const ART = /(->|<-|-->|<--|\|\s|\s\||\+--|--\+|__\||\^|\bv\b|[┌┐└┘│�
 // A line that is mostly rule characters, which is what the body of a typed box is made of.
 const RULE_LINE = /^[\s|+\-_=^v<>*.:/\\()[\]{}│─┌┐└┘├┤┬┴┼╭╮╯╰═║╔╗╚╝▲▼←→↑↓]+$/;
 
+// A DIRECTORY TREE is not a diagram and is the right way to show a repo layout. It is built from
+// the same box-drawing characters as a picture, so it has to be recognised rather than described:
+// its branches all sit at the START of the line and what follows them is a path. Left out of the
+// first version and caught by sweeping the fleet, where it flagged appliedai.wiki's knowledge-repo
+// playbook. This is the kind of false positive that gets a gate switched off within a week.
+const TREE_LINE = /^[\s│├└─|`+\\-]*[A-Za-z0-9_.@-]+(\/|\.[A-Za-z0-9]{1,5})/;
+
+function looksLikeDirectoryTree(body) {
+  const lines = body.filter((l) => l.trim());
+  if (lines.length < 3) return false;
+  return lines.filter((l) => TREE_LINE.test(l)).length / lines.length >= 0.6;
+}
+
 export function findAsciiDiagrams(source) {
   const lines = source.split('\n');
   const findings = [];
   let fence = null;
 
   lines.forEach((line, i) => {
-    const open = line.match(/^(\s*)(`{3,}|~{3,})\s*([A-Za-z0-9_+-]*)\s*$/);
+    // The language is the FIRST token after the fence and everything after it is meta, which
+    // Docusaurus uses constantly: ```bash title="Terminal", ```js {1,3}, ```py showLineNumbers.
+    // An opener regex anchored to end-of-line does not match those, so the OPENER is missed, the
+    // CLOSER is read as an untagged opener, and the prose after a perfectly ordinary shell block
+    // gets scanned as if it were inside a fence. Found by sweeping the fleet: getfreedom.wiki's
+    // install page reported a diagram it does not have.
+    const open = line.match(/^(\s*)(`{3,}|~{3,})\s*([A-Za-z0-9_+-]*)(?:[ \t][^\n]*)?$/);
     if (open && !fence) {
       fence = {marker: open[2][0], len: open[2].length, lang: open[3].toLowerCase(), start: i + 1, body: []};
       return;
@@ -58,7 +77,7 @@ export function findAsciiDiagrams(source) {
           const ruleLines = fence.body.filter((l) => l.trim() && RULE_LINE.test(l));
           // Two independent signals, so a two-line snippet of shell output does not trip it:
           // several lines carrying box marks, and at least one line that is nothing BUT marks.
-          if (artLines.length >= 3 && ruleLines.length >= 1) {
+          if (artLines.length >= 3 && ruleLines.length >= 1 && !looksLikeDirectoryTree(fence.body)) {
             findings.push({line: fence.start, lang: fence.lang || '(none)', sample: artLines[0].trim().slice(0, 60)});
           }
         }

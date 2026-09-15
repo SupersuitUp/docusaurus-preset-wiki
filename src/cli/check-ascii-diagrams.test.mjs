@@ -85,3 +85,40 @@ test('reports the line the fence opened on, so the message points somewhere', ()
   const [found] = findAsciiDiagrams(src);
   assert.equal(found.line, 5);
 });
+
+/* ---- the two false positives the fleet sweep found, before the gate had shipped anywhere ---- */
+
+test('does NOT fire on a directory tree, which is the right way to show a repo layout', () => {
+  const src = fence('', [
+    'your-knowledge-repo/',
+    '├── CLAUDE.md',
+    '├── README.md',
+    '│',
+    '├── docs/',
+    '│   ├── vision/',
+    '│   ├── icp/',
+    '│   └── research/',
+  ].join('\n'));
+  assert.deepEqual(findAsciiDiagrams(src), []);
+});
+
+test('reads the language off a fence carrying docusaurus meta, so the CLOSER is not read as an opener', () => {
+  // ```bash title="Terminal" opens a real code block. An opener regex anchored to end-of-line
+  // misses it, then treats the closing ``` as an untagged opener and scans the PROSE after it.
+  const src = [
+    '```bash title="Terminal"',
+    'curl -fsSL https://example.com/install.sh | bash',
+    '```',
+    '',
+    'Verify with `claude --version`. If that says command not found -> open a new window.',
+    'The installer puts the binary in ~/.local/bin | and a shell already open does not know.',
+    '^ that is the whole gotcha.',
+    '|',
+  ].join('\n');
+  assert.deepEqual(findAsciiDiagrams(src), []);
+});
+
+test('still reads the language off the plain form, and off a highlight range', () => {
+  const meta = fence('js {1,3}', ['const a = 1;', 'const b = a -> 2;', 'const c = a | b;', 'const d = [a, b] ;'].join('\n'));
+  assert.deepEqual(findAsciiDiagrams(meta), []);
+});

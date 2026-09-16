@@ -94,13 +94,42 @@ test("machinePaths: 'gated' still serves hosted skills and generators, which are
   assert.equal(await mw(req('https://t.wiki/generators/y/gen.mjs')), undefined);
 });
 
-test("machinePaths: 'gated' opens the text to a key, so an agent with the password still reads it", async () => {
+test("machinePaths: 'gated' SERVES the text to a correct key, in one fetch, with no cookie jar", async () => {
+  // This asserted a 303 until 2026-09-16, and the 303 is what made the feature unusable by the
+  // only caller it exists for. A machine path is fetched by a program: no URL bar to clean, and
+  // frequently no cookie jar, so a redirect to a clean URL is an instruction it cannot follow.
+  // One stateless fetch landed on a 401 and read it as a wrong password, which is what
+  // `registry.mjs probe --key` reported on a wiki whose password was correct. Reported by
+  // @brayantenesaca10-boop (ContinentalWorks/freedom#137), who worked around it by hand-writing
+  // a gate that does exactly this.
+  //
+  // `undefined` from the middleware means the request passes through to the file.
   const mw = gatedMachine();
-  const res = await mw(req('https://t.wiki/llms-full.txt?key=glory%20hour'));
+  for (const path of ['/llms-full.txt', '/llms.txt', '/the-argument/shame.md', '/talks/one.mp3']) {
+    assert.equal(await mw(req(`https://t.wiki${path}?key=glory%20hour`)), undefined,
+      `${path} must be served to a correct key in ONE request`);
+  }
+});
+
+test("a correct key on a PAGE still redirects, because a browser has a URL bar to clean", async () => {
+  // The other half of the change above, pinned so the machine-path case cannot be widened into
+  // it by accident. A page keeps the 303: it gets the password out of the address bar, out of
+  // the referer and out of history, and leaves a ticket so the rest of the visit needs no key.
+  const mw = gatedMachine();
+  const res = await mw(req('https://t.wiki/the-argument/shame?key=glory%20hour'));
   assert.equal(res?.status, 303);
-  assert.equal(res!.headers.get('location'), '/llms-full.txt');
+  assert.equal(res!.headers.get('location'), '/the-argument/shame');
   const cookie = cookieOf(res!);
-  assert.equal(await mw(req('https://t.wiki/llms-full.txt', { cookie })), undefined);
+  assert.equal(await mw(req('https://t.wiki/the-argument/shame', { cookie })), undefined);
+});
+
+test("a WRONG key on a machine path is still refused", async () => {
+  // The grant is narrow: serving without a redirect must not become serving without a check.
+  const mw = gatedMachine();
+  for (const path of ['/llms-full.txt', '/the-argument/shame.md']) {
+    assert.equal((await mw(req(`https://t.wiki${path}?key=wrong`)))?.status, 401, path);
+    assert.equal((await mw(req(`https://t.wiki${path}`)))?.status, 401, `${path} with no key`);
+  }
 });
 
 test("machinePaths defaults to 'open', so no wiki already deployed changes behaviour", async () => {

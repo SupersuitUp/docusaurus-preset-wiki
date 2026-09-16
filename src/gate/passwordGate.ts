@@ -239,6 +239,25 @@ export function createPasswordGate(opts: PasswordGateOptions = {}): GateFn | und
 
     const key = url.searchParams.get(unlockParam);
     if (key !== null && normalize(key) === normalize(password)) {
+      // A CORRECT KEY ON A MACHINE PATH SERVES THE FILE. No redirect, no ticket.
+      //
+      // The 303-and-set-a-ticket dance below is right for an HTML page: it gets the password out
+      // of the URL bar, out of the referer and out of history, and hands the browser a cookie so
+      // the rest of the visit needs no key. Every one of those reasons is about a BROWSER.
+      //
+      // A machine path is fetched by a program. It has no URL bar to clean, and frequently no
+      // cookie jar, so the 303 was an instruction it could not follow: a single stateless `fetch`
+      // lands on the clean URL carrying no ticket and gets a 401, which reads as a wrong
+      // password. `registry.mjs probe --key` did exactly that and reported "gated: the key was
+      // refused" for a key that was correct, on a wiki where `curl -L -c jar -b jar` returned the
+      // whole file. Reported by @brayantenesaca10-boop (ContinentalWorks/freedom#137), who worked
+      // around it by hand-writing a gate that does this, which is the tell that ours was wrong.
+      //
+      // This grants no access the redirect did not already grant: a caller holding the right
+      // password could always reach the file in two requests with a jar. It removes the jar.
+      if (MACHINE_PATH_PATTERN.test(url.pathname) || MACHINE_PREFIX_PATTERN.test(url.pathname)) {
+        return { authorized: true };
+      }
       const clean = new URL(url.toString());
       clean.searchParams.delete(unlockParam);
       return {

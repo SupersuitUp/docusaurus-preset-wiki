@@ -12,9 +12,11 @@
 //      docusaurus.config.pre-package.ts and the differences are printed, because those are per-wiki
 //      choices a script must not guess at; carry them into defineWikiConfig's second argument.
 //   3. middleware.ts: a template-identical open middleware becomes the re-export plus the matcher
-//      literal; one that reads WIKI_PASSWORD becomes createMiddleware({ gate: createPasswordGate() });
-//      anything else (Google identity, a member list) is LEFT ALONE and named, because its verdict
-//      function is the wiki's own and has to be moved by a person into createMiddleware({ gate }).
+//      literal. One that reads WIKI_PASSWORD is the wiki's OWN (the template never shipped a
+//      password gate), so it is kept aside as middleware.pre-package.ts, the package gate is
+//      written CLOSED (createPasswordGate({ machinePaths: 'gated' })) and a person is named to
+//      reconcile the two. Anything else (Google identity, a member list) is LEFT ALONE and named,
+//      because its verdict function has to be moved by a person into createMiddleware({ gate }).
 //   4. src/css/custom.css keeps only the brand tokens: the :root block at the top and everything
 //      from the "Dark mode" section to the end. The layout sections between them are the package's.
 //   5. docs: @site/src/components/<X> imports become @theme/<X>.
@@ -62,6 +64,16 @@ function write(p, text) {
   log(`wrote ${p}`);
 }
 
+/** Which of the three shapes a pre-package middleware.ts is. `open` is the template's own file
+ *  (bot-block and shares, no door) and may be replaced freely. `password` reads WIKI_PASSWORD, and
+ *  the template never shipped that, so it was written by a person. `identity` carries a door the
+ *  package has no equivalent for. Identity wins over password because such a file reads both. */
+export function middlewareKind(text) {
+  if (/GOOGLE_OAUTH|GATE_IDENTITY|member/i.test(text)) return "identity";
+  if (/WIKI_PASSWORD/.test(text)) return "password";
+  return "open";
+}
+
 export function matcherLiteral() {
   const { matcher } = JSON.parse(readFileSync(join(HERE, "matcher.json"), "utf8"));
   return matcher[0].replace(/\\/g, "\\\\");
@@ -85,12 +97,16 @@ export { default } from '${PKG}/middleware';
 
 ${CONFIG_BLOCK()}`;
 
-export const PASSWORD_MIDDLEWARE = () => `// Vercel Routing Middleware: bot-block, one-page shares and the family password gate, all from
+export const PASSWORD_MIDDLEWARE = ({ machinePaths } = {}) => `// Vercel Routing Middleware: bot-block, one-page shares and the family password gate, all from
 // the preset. The gate is dark until WIKI_PASSWORD and WIKI_GATE_SECRET are set on the deployment;
 // set them with \`wiki gate set --password "<word>"\`. A preloaded link is <page>?key=<password>.
-import { createMiddleware, createPasswordGate } from '${PKG}/middleware';
+${machinePaths === "gated" ? `// machinePaths 'gated' puts .md, .txt, audio, video, .pdf and /llms.txt behind the same door as
+// every page. 'open' serves them to anyone, which on a private wiki publishes the whole corpus
+// as /llms-full.txt. Written closed by the migration because the gate it replaced was this
+// wiki's own; open it only if that is what this wiki's content wants.
+` : ""}import { createMiddleware, createPasswordGate } from '${PKG}/middleware';
 
-export default createMiddleware({ gate: createPasswordGate() });
+export default createMiddleware({ gate: createPasswordGate(${machinePaths ? `{ machinePaths: '${machinePaths}' }` : ""}) });
 
 ${CONFIG_BLOCK()}`;
 
@@ -189,11 +205,18 @@ export function migrate() {
 
   // 3. middleware.ts
   if (existsSync(rel("middleware.ts"))) {
-    const mw = read("middleware.ts");
-    const hasGate = /WIKI_PASSWORD/.test(mw);
-    const hasIdentity = /GOOGLE_OAUTH|GATE_IDENTITY|member/i.test(mw);
-    if (hasIdentity) warnings.push("middleware.ts has a gate of its own (identity or a member list). Left untouched: move its verdict into `async function gate(request): Promise<GateVerdict>` and export createMiddleware({ gate }) plus the matcher literal (see the package README).");
-    else write("middleware.ts", hasGate ? PASSWORD_MIDDLEWARE() : OPEN_MIDDLEWARE());
+    const kind = middlewareKind(read("middleware.ts"));
+    if (kind === "identity") warnings.push("middleware.ts has a gate of its own (identity or a member list). Left untouched: move its verdict into `async function gate(request): Promise<GateVerdict>` and export createMiddleware({ gate }) plus the matcher literal (see the package README).");
+    else if (kind === "password") {
+      // A person wrote this gate: the template never shipped one. Until 1.5.0 it was overwritten
+      // with the package default, whose machine paths are OPEN, and a private wiki whose own gate
+      // covered .md and .txt came out of a SUCCESSFUL migration serving /llms-full.txt to anyone
+      // holding the URL, with every live check green because they ask about the home page
+      // (ContinentalWorks/freedom#159, 2026-09-17). So: keep theirs, write ours closed, exit 3.
+      if (!DRY) renameSync(rel("middleware.ts"), rel("middleware.pre-package.ts"));
+      write("middleware.ts", PASSWORD_MIDDLEWARE({ machinePaths: "gated" }));
+      warnings.push("middleware.ts was this wiki's own password gate; kept as middleware.pre-package.ts. The package gate is written CLOSED (createPasswordGate({ machinePaths: 'gated' })): .md, .txt, audio and /llms-full.txt answer 401 without the key. If this wiki's machine paths were open on purpose, change it to 'open'; if your gate carried anything else (an allowlist, a second door), carry it into createMiddleware({ gate }). Then delete the kept file and commit both by name.");
+    } else write("middleware.ts", OPEN_MIDDLEWARE());
   } else {
     write("middleware.ts", OPEN_MIDDLEWARE());
   }

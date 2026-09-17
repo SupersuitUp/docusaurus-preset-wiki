@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { tokensOnly, configCustomisations, rewriteDocsImports } from './migrate.mjs';
+import { tokensOnly, configCustomisations, rewriteDocsImports, middlewareKind } from './migrate.mjs';
 import { changelogBetween } from './upgrade.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -68,11 +68,29 @@ test('migrate turns a wiki-template v1.1.3 tree into a package consumer', { skip
   assert.match(JSON.parse(readFileSync(join(d, 'wiki.config.json'), 'utf8')).$schema, /node_modules\/@supersuit/);
 });
 
-test('migrate refuses a wiki already on the package and a password-gated middleware becomes createPasswordGate', { skip: !haveTemplate && 'wiki-template checkout not beside this repo' }, () => {
+test('a password-gated middleware is the wiki\'s OWN: kept aside, the package gate written CLOSED, and a person named', { skip: !haveTemplate && 'wiki-template checkout not beside this repo' }, () => {
+  // The template never shipped a password gate ("a gated wiki adds its gate BELOW the share
+  // layer"), so every middleware that reads WIKI_PASSWORD was written by a person, and the one
+  // thing it reliably differs on from the package default is what it does with machine paths.
+  // Overwriting it with an OPEN gate published a private wiki's /llms-full.txt for twenty
+  // minutes after a migration reported success (ContinentalWorks/freedom#159, 2026-09-17).
   const d = templateAt('v1.1.3');
-  writeFileSync(join(d, 'middleware.ts'), "const password = process.env.WIKI_PASSWORD ?? '';\nexport default async function middleware() {}\n");
-  spawnSync(process.execPath, [BIN, 'migrate', '--no-install', '--no-build'], { cwd: d, encoding: 'utf8' });
-  assert.match(readFileSync(join(d, 'middleware.ts'), 'utf8'), /createPasswordGate\(\)/);
+  const own = "const MACHINE_PATH = /\\.(?:md|txt)$/i;\nconst password = process.env.WIKI_PASSWORD ?? '';\nexport default async function middleware() {}\n";
+  writeFileSync(join(d, 'middleware.ts'), own);
+  const r = spawnSync(process.execPath, [BIN, 'migrate', '--no-install', '--no-build'], { cwd: d, encoding: 'utf8' });
+  assert.equal(r.status, 3, 'a replaced gate is a decision for a person, never a clean exit: ' + r.stdout + r.stderr);
+  assert.match(r.stdout, /NEEDS A PERSON: middleware\.ts was this wiki's own password gate/);
+  assert.equal(readFileSync(join(d, 'middleware.pre-package.ts'), 'utf8'), own, 'the operator\'s gate is kept byte for byte');
+  const mw = readFileSync(join(d, 'middleware.ts'), 'utf8');
+  assert.match(mw, /createPasswordGate\(\{ machinePaths: 'gated' \}\)/, 'the false positive costs a re-run; the false negative costs a published corpus');
+  assert.equal(spawnSync(process.execPath, [BIN, 'check', 'middleware'], { cwd: d, encoding: 'utf8' }).status, 0, 'the written literal still passes the check');
   const again = spawnSync(process.execPath, [BIN, 'migrate', '--no-install', '--no-build'], { cwd: d, encoding: 'utf8' });
   assert.equal(again.status, 2); assert.match(again.stderr, /wiki upgrade/);
+});
+
+test('middlewareKind tells the three shapes apart, and a password gate is never mistaken for the template', () => {
+  assert.equal(middlewareKind("export default async function middleware() {}"), 'open');
+  assert.equal(middlewareKind("const password = process.env.WIKI_PASSWORD ?? '';"), 'password');
+  assert.equal(middlewareKind("const password = process.env.WIKI_PASSWORD; const members = [];"), 'identity');
+  assert.equal(middlewareKind("GOOGLE_OAUTH_CLIENT_ID"), 'identity');
 });

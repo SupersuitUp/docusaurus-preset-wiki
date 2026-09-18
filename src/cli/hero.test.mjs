@@ -316,3 +316,44 @@ test('a usage error from the flags exits 2 with the message, never 1', async () 
   assert.match(chunks.join('\n'), /unknown flag --frob/);
   assert.match(chunks.join('\n'), /--tier must be best or fast/);
 });
+
+test('hero.tier in the config is the default tier; --tier overrides it; the recipe records the tier that ran', async () => {
+  const { root, env } = site();
+  const raw = JSON.parse(readFileSync(join(root, 'wiki.config.json'), 'utf8'));
+  raw.hero.tier = 'fast';
+  writeFileSync(join(root, 'wiki.config.json'), JSON.stringify(raw));
+  const { log, deps } = fakes();
+  const r1 = await capture(() => main(['my-page', ...PAGE, '--no-readback', '--json'], root, { ...deps, env: { ...process.env, ...env } }));
+  assert.equal(r1.code, 0);
+  const argv = log.renders[0].argv;
+  assert.equal(argv[argv.indexOf('--model') + 1], 'gpt-image-2.5-flare', 'hero.tier fast picks the draft model with no flag');
+  assert.equal(argv[argv.indexOf('--size') + 1], '1536x1024');
+  const recipe = JSON.parse(readFileSync(JSON.parse(r1.stdout).recipe, 'utf8'));
+  assert.equal(recipe.wikiHero.tier, 'fast');
+
+  const r2 = await capture(() => main(['my-page', ...PAGE, '--tier', 'best', '--no-readback', '--json'], root, { ...deps, env: { ...process.env, ...env } }));
+  assert.equal(r2.code, 0);
+  const argv2 = log.renders[1].argv;
+  assert.equal(argv2[argv2.indexOf('--model') + 1], 'gpt-image-2.5-sunburst', '--tier best overrides hero.tier fast');
+  assert.equal(JSON.parse(readFileSync(JSON.parse(r2.stdout).recipe, 'utf8')).wikiHero.tier, 'best');
+  assert.equal(parseHeroArgs(['p']).tier, undefined, 'no flag means the config decides');
+});
+
+test('a prop declared as { refs, gate } renders its photo and its gate line reaches the read-back only when --prop names it; an ad hoc --prop name=path merges into it', async () => {
+  const { root, env } = site();
+  writeFileSync(join(root, 'illustrations', 'props', 'glasses-side.png'), '');
+  const raw = JSON.parse(readFileSync(join(root, 'wiki.config.json'), 'utf8'));
+  raw.hero.props = { glasses: { refs: ['illustrations/props/glasses.png'], gate: ['the glasses match the prop photos: thick black frames'] } };
+  raw.hero.gate = [];
+  writeFileSync(join(root, 'wiki.config.json'), JSON.stringify(raw));
+  const E = { env: { ...process.env, ...env } };
+  const without = await capture(() => main(['my-page', ...PAGE, '--dry-run'], root, E));
+  assert.equal(without.code, 0);
+  assert.ok(!JSON.parse(without.stdout).gate.includes('the glasses match the prop photos: thick black frames'));
+  const withIt = await capture(() => main(['my-page', ...PAGE, '--prop', 'glasses', '--prop', 'glasses=illustrations/props/glasses-side.png', '--dry-run'], root, E));
+  assert.equal(withIt.code, 0);
+  const out = JSON.parse(withIt.stdout);
+  assert.ok(out.gate.includes('the glasses match the prop photos: thick black frames'));
+  assert.deepEqual(out.refs.filter((r) => r.role === 'prop').map((r) => r.path.split('/').pop()), ['glasses.png', 'glasses-side.png']);
+  assert.match(out.prompt, /the glasses \(2 photographs\)/);
+});

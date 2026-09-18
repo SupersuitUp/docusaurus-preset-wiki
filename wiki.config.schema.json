@@ -54,6 +54,27 @@
         "motifRefs": { "type": "array", "items": { "type": "string" }, "description": "mode abu only. Locked motif plates." }
       }
     },
+    "hero": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How `wiki hero` makes this wiki's article heroes: a shared Style Pack paints them, the wiki-layer laws (one image of N equal panels in a row or a two-by-two grid, cream gutters, no borders, a title bar and one label band per panel and no other text) shape them. Supersedes `hero_register`, which `wiki hero` migrates in memory when this block is absent.",
+      "required": ["stylePack"],
+      "properties": {
+        "stylePack": { "type": "string", "description": "The Style Pack that paints the heroes: a path to a pack folder (holding pack.json and refs/), or a bare id looked up in $WIKI_STYLE_PACKS and then ../wiki-style-packs/packs beside the wiki." },
+        "layout": { "type": "string", "enum": ["row", "grid"], "description": "row: the beats left to right in one horizontal strip. grid: exactly four beats in two columns and two rows, read left to right then top to bottom. Default grid." },
+        "beats": { "type": "integer", "minimum": 2, "maximum": 6, "description": "Panels per hero. Default 4. A grid holds exactly four." },
+        "size": { "type": "string", "pattern": "^[0-9]+x[0-9]+$", "description": "WIDTHxHEIGHT, both divisible by 16. Default 2560x1440." },
+        "model": { "type": "string", "description": "Image model id. Default gpt-image-2.5-sunburst." },
+        "quality": { "type": "string", "description": "Model quality tier. Default xhigh." },
+        "outputDir": { "type": "string", "description": "Where the deploy WebP, the source PNG and the provenance recipe land. Default static/img/illustrations." },
+        "props": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } },
+          "description": "Objects that must be drawn accurately, by name: each maps to one or more photographs (paths relative to the wiki root). A page opts in with `wiki hero --prop <name>`; the photos are passed after the style refs and named as props so the model copies the object, never the photograph."
+        },
+        "gate": { "type": "array", "items": { "type": "string" }, "description": "Read-back assertions specific to this wiki, one per string, checked after the wiki-layer defaults and the pack's own gate." }
+      }
+    },
     "intake_mode": { "type": "string", "enum": ["source-grounded", "authored-canon"], "description": "How this wiki grows. source-grounded: fold in external sources faithfully with citation. authored-canon: author net-new original philosophy that coheres with the canon. Drives which intake skill scripts/init-intake-skill.sh scaffolds into static/skills/." },
     "skill_prefix": { "type": "string", "description": "Namespace for this wiki's skills when registered into the global registry (e.g. 'humanperformance' -> humanperformance-intake). Defaults to projectName minus a trailing -wiki. Used by scripts/register-skills.sh." },
     "og": {

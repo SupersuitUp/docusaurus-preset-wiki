@@ -17,6 +17,7 @@ export interface WikiConfig {
   intake_mode?: 'source-grounded' | 'authored-canon';
   skill_prefix?: string;
   hero_register?: Record<string, unknown>;
+  hero?: Record<string, unknown>;
   $schema?: string;
 }
 

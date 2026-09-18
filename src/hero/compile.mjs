@@ -9,10 +9,13 @@
 //   layout   one image, N equal panels, cream gutters, no drawn borders, one world and one cast
 //   text     a title bar across the top and one label band per panel, spelled exactly, nothing else
 //   props    a prop photo is passed AFTER the style refs and named as a prop, so the model copies
-//            the object and not the photograph
+//            the object and not the photograph; a prop's own gate lines join the read-back only
+//            when that prop is in the scene
+//   pairings the pack's standing rules (how a recurring subject is always shown), one line each,
+//            between the layout law and the beats, so every scene the pack paints inherits them
 import { existsSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
-import { validateSize } from './config.mjs';
+import { normalizeProp, validateSize } from './config.mjs';
 
 /** The most style refs passed after the anchor. More than this and the anchor stops anchoring. */
 const MAX_STYLE_REFS = 3;
@@ -47,8 +50,8 @@ function textLaw(title, labels) {
 }
 
 function propLaw(props) {
-  const names = Object.entries(props).map(([name, paths]) => `the ${name.replace(/[-_]+/g, ' ')} (${paths.length} ${paths.length === 1 ? 'photograph' : 'photographs'})`);
-  const count = Object.values(props).reduce((n, paths) => n + paths.length, 0);
+  const names = Object.entries(props).map(([name, { refs }]) => `the ${name.replace(/[-_]+/g, ' ')} (${refs.length} ${refs.length === 1 ? 'photograph' : 'photographs'})`);
+  const count = Object.values(props).reduce((n, { refs }) => n + refs.length, 0);
   const which = names.length === 1 ? 'an object that must appear' : 'objects that must each appear';
   return `The FIRST reference image(s) carry the visual style and nothing else. The LAST ${count} reference image(s) are PROP references: photographs of ${joinNames(names)}, ${which} in the scene drawn accurately in shape and detail, in this illustration's painted register, never copying the photograph's realism, background or people.`;
 }
@@ -56,6 +59,27 @@ function propLaw(props) {
 function joinNames(names) {
   if (names.length <= 1) return names[0] ?? '';
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/**
+ * The pack's standing rules as one line each. A pairing is a string, or the object the review
+ * frapp writes (`{ rule, subject, shownAs, ... }`): the rule when it has one, else composed from
+ * the subject and how it is shown. Blanks drop out; duplicates are said once.
+ */
+export function pairingLines(pairings) {
+  if (!Array.isArray(pairings)) return [];
+  return dedupe(pairings.map((p) => {
+    if (typeof p === 'string') return p;
+    if (!p || typeof p !== 'object') return '';
+    if (typeof p.rule === 'string' && p.rule.trim()) return p.rule;
+    if (typeof p.subject === 'string' && p.subject.trim() && typeof p.shownAs === 'string' && p.shownAs.trim()) return `${p.subject.trim()} is shown as ${p.shownAs.trim()}`;
+    return '';
+  }));
+}
+
+function standingRules(pairings) {
+  const lines = pairingLines(pairings);
+  return lines.length ? `Standing rules for every scene:\n${lines.map((l) => `- ${l}`).join('\n')}` : '';
 }
 
 function paletteLine(palette) {
@@ -92,10 +116,12 @@ function dedupe(lines) {
  *   title   the words across the top, verbatim
  *   labels  one label per panel, verbatim
  *   beats   the scene, one string per panel, verbatim
- *   props   { name: [paths] } for the props this page uses; paths absolute or relative to cwd
+ *   props   the props this page uses: { name: [paths] } or { name: { refs: [paths], gate: [...] } };
+ *           paths absolute or relative to config.root (else cwd). A prop's gate joins the returned
+ *           gate only because the prop is passed here.
  * Returns { prompt, refs: [{ path, role }], strings: [{ text, placement }], gate: string[] }.
  */
-export function compileHero({ pack, config, title, labels, beats, props = {} }) {
+export function compileHero({ pack, config, title, labels, beats, props: rawProps = {} }) {
   if (!pack || typeof pack !== 'object') throw new Error('compileHero needs a loaded style pack');
   if (!config || typeof config !== 'object') throw new Error('compileHero needs the hero config');
   const layout = config.layout ?? 'grid';
@@ -129,9 +155,11 @@ export function compileHero({ pack, config, title, labels, beats, props = {} }) 
     if (!existsSync(p)) throw new Error(`pack ref not found: ${rel} (looked at ${p})`);
   }
   for (const rel of others.slice(0, MAX_STYLE_REFS)) refs.push({ path: packPath(rel), role: 'style' });
+  if (rawProps === null || typeof rawProps !== 'object' || Array.isArray(rawProps)) throw new Error('props must be an object keyed by prop name');
+  const props = Object.fromEntries(Object.entries(rawProps).map(([name, value]) => [name, normalizeProp(name, value)]));
   const propNames = Object.keys(props);
   for (const name of propNames) {
-    for (const rel of props[name]) {
+    for (const rel of props[name].refs) {
       const p = isAbsolute(rel) ? rel : join(config.root ?? process.cwd(), rel);
       if (!existsSync(p)) throw new Error(`prop "${name}" not found: ${rel} (looked at ${p})`);
       refs.push({ path: p, role: 'prop' });
@@ -141,8 +169,10 @@ export function compileHero({ pack, config, title, labels, beats, props = {} }) 
   const sections = [
     `${pack.styleLine}${paletteLine(pack.palette)}`,
     layoutLaw(layout, beats.length),
-    `The scene, beat by beat:\n${beats.map((b, i) => `${i + 1}. ${b}`).join('\n')}`,
   ];
+  const rules = standingRules(pack.pairings);
+  if (rules) sections.push(rules);
+  sections.push(`The scene, beat by beat:\n${beats.map((b, i) => `${i + 1}. ${b}`).join('\n')}`);
   if (propNames.length) sections.push(propLaw(props));
   sections.push(textLaw(title, labels));
   const neg = negatives(pack.rejectedPoles ?? []);
@@ -158,6 +188,7 @@ export function compileHero({ pack, config, title, labels, beats, props = {} }) 
     ...wikiGate({ layout, beats: beats.length }),
     ...(pack.gate ?? []),
     ...(config.gate ?? []),
+    ...propNames.flatMap((name) => props[name].gate),
   ]);
 
   return { prompt, refs, strings, gate };

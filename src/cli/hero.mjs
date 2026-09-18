@@ -20,7 +20,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { readHeroConfig, resolvePackDir, loadPack } from '../hero/config.mjs';
+import { readHeroConfig, resolvePackDir, loadPack, normalizeProp } from '../hero/config.mjs';
 import { compileHero } from '../hero/compile.mjs';
 import { resolveAdapter, renderHero } from '../hero/render.mjs';
 import { readBack, counterClauses, DEFAULT_VISION_MODEL } from '../hero/readback.mjs';
@@ -47,7 +47,8 @@ const HELP = `wiki hero <slug> --title "<words>" --labels "a|b|c|d" --beats "<be
                     an ad hoc prop photo for this page only, relative to the wiki root
   --pack <id|path>  use this Style Pack instead of hero.stylePack
   --layout grid|row override hero.layout (a grid takes exactly four beats)
-  --tier best|fast  best (default) is hero.model at hero.quality and hero.size; fast is ${TIERS.fast.model} at ${TIERS.fast.quality}, ${TIERS.fast.size}
+  --tier best|fast  best is hero.model at hero.quality and hero.size; fast is ${TIERS.fast.model} at ${TIERS.fast.quality}, ${TIERS.fast.size}
+                    (default: hero.tier in wiki.config.json, else best)
   --dry-run         print the compiled prompt, refs, strings and gate as JSON; no API call
   --no-readback     render once and publish without the vision check
   --publish <png>   publish this already-rendered round (its recipe beside it) without rendering
@@ -74,7 +75,7 @@ function splitBeats(text) {
 export function parseHeroArgs(argv) {
   const out = {
     slug: undefined, title: undefined, beats: [], labels: [], props: [], adHocProps: {},
-    pack: undefined, layout: undefined, tier: 'best', page: undefined, publish: undefined,
+    pack: undefined, layout: undefined, tier: undefined, page: undefined, publish: undefined,
     dryRun: false, readback: true, write: false, json: false, help: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -172,14 +173,16 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
     config.stylePack = args.pack;
   }
   if (args.layout) config.layout = args.layout;
-  const tier = TIERS[args.tier];
+  const tierName = args.tier ?? config.tier ?? 'best';
+  const tier = TIERS[tierName];
   const model = tier?.model ?? config.model;
   const quality = tier?.quality ?? config.quality;
   const size = tier?.size ?? config.size;
 
   const props = selectProps(args.props, config.props);
   for (const [name, paths] of Object.entries(args.adHocProps)) {
-    props[name] = [...(props[name] ?? []), ...paths.map((p) => (isAbsolute(p) ? p : resolve(root, p)))];
+    const declared = props[name] ? normalizeProp(name, props[name]) : { refs: [], gate: [] };
+    props[name] = { refs: [...declared.refs, ...paths.map((p) => (isAbsolute(p) ? p : resolve(root, p)))], gate: declared.gate };
   }
   const compiled = compileHero({ pack: config.pack, config, title: args.title, labels: args.labels, beats: args.beats, props });
   const alt = heroAlt({ title: args.title, labels: args.labels, beats: args.beats });
@@ -278,7 +281,7 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
     png, recipe, slug: args.slug, outputDir: config.outputDir, root, alt, readback,
     extra: {
       stylePack: config.pack.id,
-      wikiHero: { slug: args.slug, title: args.title, labels: args.labels, beats: args.beats, layout: config.layout, tier: args.tier, adapter: adapter?.kind ?? 'none (--publish)' },
+      wikiHero: { slug: args.slug, title: args.title, labels: args.labels, beats: args.beats, layout: config.layout, tier: tierName, adapter: adapter?.kind ?? 'none (--publish)' },
     },
     optimize: deps.optimize, page: args.page, write: args.write,
   });

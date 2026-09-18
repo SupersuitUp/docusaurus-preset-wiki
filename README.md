@@ -139,14 +139,25 @@ it ships. The wiki declares the pack and the defaults once, in `wiki.config.json
 "hero": {
   "stylePack": "warm-editorial-titled",
   "layout": "grid",
-  "props": { "smart-glasses": ["illustrations/props/smart-glasses.png"] },
-  "gate": ["the smart glasses match the prop photos"]
+  "tier": "best",
+  "props": {
+    "smart-glasses": {
+      "refs": ["illustrations/props/smart-glasses.png"],
+      "gate": ["the smart glasses match the prop photos: thick black frames, clear lenses"]
+    }
+  },
+  "gate": ["every face is drawn, never a blank oval"]
 }
 ```
 
 `stylePack` is a path, or an id looked up in `$WIKI_STYLE_PACKS` and then `../wiki-style-packs/packs`
-beside the wiki. A wiki still carrying the older `hero_register` block is migrated in memory. The
-page supplies the rest:
+beside the wiki. A wiki still carrying the older `hero_register` block is migrated in memory.
+`tier` is the render tier when no `--tier` is given. A prop is a list of photos, or `{ refs, gate }`
+when it carries its own read-back lines: those join the gate only on a render that passes the prop,
+so the wiki-wide `gate` holds only what is true of every hero. A rule about how a recurring subject
+is always shown belongs in the pack's `pairings` (a string, or the `{ rule, subject, shownAs }`
+entry the review frapp writes), which the compiler emits as one "Standing rules for every scene"
+block between the layout law and the beats. The page supplies the rest:
 
 ```bash
 wiki hero capture --title "CAPTURE WITHOUT THE WALL" --labels "the phone|the glasses|the second angle|still there" \

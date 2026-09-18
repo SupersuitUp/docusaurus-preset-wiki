@@ -101,7 +101,7 @@ test('legacy hero_register migrates in memory: the register sentence becomes an 
   assert.equal(c.size, '1536x1024');
   assert.equal(c.quality, 'high');
   assert.equal(c.outputDir, 'static/img/heroes');
-  assert.deepEqual(c.props, { 'smart-glasses': ['illustrations/props/g.png'] });
+  assert.deepEqual(c.props, { 'smart-glasses': { refs: ['illustrations/props/g.png'], gate: [] } });
   assert.deepEqual(c.gate, ['every person has open eyes']);
   assert.equal(c.pack.styleLine, 'Loose watercolor washes on cream paper.');
   assert.equal(c.pack.anchor, 'illustrations/refs/a.png');
@@ -185,4 +185,48 @@ test('a legacy hero_register with no layout key migrates to row, the shell door\
   const c = readHeroConfig(root, { env: {} });
   assert.equal(c.layout, 'row');
   assert.equal(c.beats, 3);
+});
+
+test('loadPack carries pairings as a list (missing means empty), and an inline legacy pack carries hero_register.pairings', () => {
+  const packs = mkdtempSync(join(tmpdir(), 'packs-'));
+  const withPairings = pack(packs, 'paired', { pairings: ['labeling is shown in the machine', { rule: 'the archive is shown as a shelf', subject: 'the archive', shownAs: 'a shelf' }] });
+  assert.equal(loadPack(withPairings).pairings.length, 2);
+  assert.deepEqual(loadPack(pack(packs, 'bare')).pairings, []);
+  assert.deepEqual(loadPack(pack(packs, 'wrong', { pairings: 'not a list' })).pairings, []);
+
+  const legacy = wiki({ hero_register: { register: 'r', layout: 'grid', pairings: ['one standing rule'] } });
+  assert.deepEqual(readHeroConfig(legacy, { env: {} }).pack.pairings, ['one standing rule']);
+  const legacyNone = wiki({ hero_register: { register: 'r', layout: 'grid' } });
+  assert.deepEqual(readHeroConfig(legacyNone, { env: {} }).pack.pairings, []);
+});
+
+test('hero.tier defaults to best and must be best or fast', () => {
+  const packs = mkdtempSync(join(tmpdir(), 'packs-'));
+  pack(packs, 'p');
+  const env = { WIKI_STYLE_PACKS: packs };
+  assert.equal(HERO_DEFAULTS.tier, 'best');
+  assert.equal(readHeroConfig(wiki({ hero: { stylePack: 'p' } }), { env }).tier, 'best');
+  assert.equal(readHeroConfig(wiki({ hero: { stylePack: 'p', tier: 'fast' } }), { env }).tier, 'fast');
+  assert.throws(() => readHeroConfig(wiki({ hero: { stylePack: 'p', tier: 'draft' } }), { env }), /tier.*best.*fast/);
+  // A legacy block never had a tier and gets the default.
+  assert.equal(readHeroConfig(wiki({ hero_register: { register: 'r', layout: 'grid' } }), { env: {} }).tier, 'best');
+});
+
+test('props normalize to { refs, gate } whether written as a list of paths or as an object, and a bad gate is refused by prop name', () => {
+  const packs = mkdtempSync(join(tmpdir(), 'packs-'));
+  pack(packs, 'p');
+  const env = { WIKI_STYLE_PACKS: packs };
+  const c = readHeroConfig(wiki({ hero: { stylePack: 'p', props: {
+    glasses: ['illustrations/props/g1.png', 'illustrations/props/g2.png'],
+    hat: { refs: ['illustrations/props/hat.png'], gate: ['the hat is a straw boater'] },
+    scarf: { refs: ['illustrations/props/scarf.png'] },
+  } } }), { env });
+  assert.deepEqual(c.props, {
+    glasses: { refs: ['illustrations/props/g1.png', 'illustrations/props/g2.png'], gate: [] },
+    hat: { refs: ['illustrations/props/hat.png'], gate: ['the hat is a straw boater'] },
+    scarf: { refs: ['illustrations/props/scarf.png'], gate: [] },
+  });
+  assert.throws(() => readHeroConfig(wiki({ hero: { stylePack: 'p', props: { hat: { refs: ['x.png'], gate: 'one line' } } } }), { env }), /props\.hat/);
+  assert.throws(() => readHeroConfig(wiki({ hero: { stylePack: 'p', props: { hat: { gate: ['x'] } } } }), { env }), /props\.hat/);
+  assert.throws(() => readHeroConfig(wiki({ hero: { stylePack: 'p', props: { hat: { refs: [] } } } }), { env }), /props\.hat/);
 });

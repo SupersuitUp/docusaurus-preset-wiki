@@ -196,3 +196,59 @@ test('no em dash anywhere in the compiled prompt', () => {
   const { prompt } = compileHero(page());
   assert.doesNotMatch(prompt, /\u2014/);
 });
+
+test('pack pairings are emitted as one standing-rules block between the layout law and the beats, one line each, strings and frapp objects alike', () => {
+  const p = pack({
+    pairings: [
+      'labeling and organizing is shown happening in the machine, never by a person typing',
+      { rule: 'the archive is shown as a shelf of dated folders', subject: 'the archive', shownAs: 'a shelf of dated folders', from: 'w', at: '2026-09-18' },
+      { subject: 'the ledger', shownAs: 'a bound book' },
+      '  labeling and organizing is shown happening in the machine, never by a person typing ',
+      '',
+    ],
+  });
+  const { prompt } = compileHero(page({ pack: p }));
+  const block = 'Standing rules for every scene:\n- labeling and organizing is shown happening in the machine, never by a person typing\n- the archive is shown as a shelf of dated folders\n- the ledger is shown as a bound book';
+  assert.ok(prompt.includes(block), `expected the block verbatim once:\n${prompt}`);
+  assert.equal(prompt.split('labeling and organizing').length - 1, 1, 'a duplicate pairing is emitted once');
+  const sections = prompt.split('\n\n');
+  const at = sections.findIndex((s) => s.startsWith('Standing rules for every scene:'));
+  assert.ok(sections[at - 1].startsWith('ONE single image divided into'), 'the block follows the layout law');
+  assert.ok(sections[at + 1].startsWith('The scene, beat by beat:'), 'the beats follow the block');
+});
+
+test('no pairings, an empty list, or a list of blanks emits no standing-rules block', () => {
+  assert.doesNotMatch(compileHero(page({ pack: pack() })).prompt, /Standing rules/);
+  assert.doesNotMatch(compileHero(page({ pack: pack({ pairings: [] }) })).prompt, /Standing rules/);
+  assert.doesNotMatch(compileHero(page({ pack: pack({ pairings: ['', { subject: 'x' }] }) })).prompt, /Standing rules/);
+});
+
+test('a prop declared as { refs, gate } contributes its refs, and its gate lines join the returned gate only when that prop is passed', () => {
+  const propsDir = mkdtempSync(join(tmpdir(), 'props-'));
+  const a = join(propsDir, 'glasses-front.png');
+  writeFileSync(a, '');
+  const glassesLine = 'smart glasses match the prop photos: thick black frames, camera dot at the front corner, clear lenses';
+  const c = config({ props: { 'smart-glasses': { refs: [a], gate: [glassesLine] } }, gate: ['a wiki-wide line'] });
+
+  const without = compileHero(page({ config: c, props: {} }));
+  assert.ok(!without.gate.includes(glassesLine), 'a prop not passed leaves its gate out');
+  assert.ok(without.gate.includes('a wiki-wide line'));
+
+  const withIt = compileHero(page({ config: c, props: { 'smart-glasses': { refs: [a], gate: [glassesLine] } } }));
+  assert.deepEqual(withIt.refs.slice(-1).map((r) => [r.role, r.path]), [['prop', a]]);
+  assert.match(withIt.prompt, /The LAST 1 reference image\(s\) are PROP references: photographs of the smart glasses \(1 photograph\)/);
+  assert.ok(withIt.gate.includes(glassesLine), 'the passed prop carries its gate in');
+  // Order: wiki defaults, pack gate, config gate, then the prop gates.
+  assert.ok(withIt.gate.indexOf('a wiki-wide line') < withIt.gate.indexOf(glassesLine));
+  assert.equal(withIt.gate.filter((g) => g === glassesLine).length, 1);
+
+  // The plain list form still works and carries no gate of its own.
+  const plain = compileHero(page({ config: c, props: { 'smart-glasses': [a] } }));
+  assert.ok(!plain.gate.includes(glassesLine));
+  assert.equal(plain.refs.filter((r) => r.role === 'prop').length, 1);
+});
+
+test('a prop object with no refs, or a gate that is not a list of strings, is refused by name', () => {
+  assert.throws(() => compileHero(page({ props: { hat: { gate: ['x'] } } })), /hat/);
+  assert.throws(() => compileHero(page({ props: { hat: { refs: [], gate: 'x' } } })), /hat/);
+});

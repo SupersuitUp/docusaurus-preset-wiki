@@ -66,13 +66,27 @@
         "size": { "type": "string", "pattern": "^[0-9]+x[0-9]+$", "description": "WIDTHxHEIGHT, both divisible by 16. Default 2560x1440." },
         "model": { "type": "string", "description": "Image model id. Default gpt-image-2.5-sunburst." },
         "quality": { "type": "string", "description": "Model quality tier. Default xhigh." },
+        "tier": { "type": "string", "enum": ["best", "fast"], "description": "The tier `wiki hero` renders at when no --tier flag is given. best: hero.model at hero.quality and hero.size. fast: the cheaper draft model at the draft size. Default best." },
         "outputDir": { "type": "string", "description": "Where the deploy WebP, the source PNG and the provenance recipe land. Default static/img/illustrations." },
         "props": {
           "type": "object",
-          "additionalProperties": { "type": "array", "items": { "type": "string" } },
-          "description": "Objects that must be drawn accurately, by name: each maps to one or more photographs (paths relative to the wiki root). A page opts in with `wiki hero --prop <name>`; the photos are passed after the style refs and named as props so the model copies the object, never the photograph."
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "array", "minItems": 1, "items": { "type": "string" } },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["refs"],
+                "properties": {
+                  "refs": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "The prop's photographs, paths relative to the wiki root." },
+                  "gate": { "type": "array", "items": { "type": "string" }, "description": "Read-back assertions about this prop, one per string, checked only on a render that passes the prop. A prop-specific truth lives here, never in the wiki-wide gate." }
+                }
+              }
+            ]
+          },
+          "description": "Objects that must be drawn accurately, by name: each maps to one or more photographs (paths relative to the wiki root), or to { refs, gate } when the prop carries its own read-back lines. A page opts in with `wiki hero --prop <name>`; the photos are passed after the style refs and named as props so the model copies the object, never the photograph, and the prop's gate joins the read-back for that render only."
         },
-        "gate": { "type": "array", "items": { "type": "string" }, "description": "Read-back assertions specific to this wiki, one per string, checked after the wiki-layer defaults and the pack's own gate." }
+        "gate": { "type": "array", "items": { "type": "string" }, "description": "Read-back assertions true of every hero this wiki makes, one per string, checked after the wiki-layer defaults and the pack's own gate. A line about one prop belongs on that prop's gate; a line about how a recurring subject is always shown belongs in the pack's pairings." }
       }
     },
     "intake_mode": { "type": "string", "enum": ["source-grounded", "authored-canon"], "description": "How this wiki grows. source-grounded: fold in external sources faithfully with citation. authored-canon: author net-new original philosophy that coheres with the canon. Drives which intake skill scripts/init-intake-skill.sh scaffolds into static/skills/." },

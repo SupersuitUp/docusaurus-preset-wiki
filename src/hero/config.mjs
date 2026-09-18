@@ -14,10 +14,13 @@ export const HERO_DEFAULTS = Object.freeze({
   size: '2560x1440',
   model: 'gpt-image-2.5-sunburst',
   quality: 'xhigh',
+  tier: 'best',
   outputDir: 'static/img/illustrations',
 });
 
 const LAYOUTS = ['row', 'grid'];
+/** `best` renders at the wiki's own model, quality and size; `fast` is the cheaper draft tier. */
+export const TIERS_ALLOWED = ['best', 'fast'];
 
 /** WIDTHxHEIGHT, both sides a whole number of sixteens. Throws naming the offending value. */
 export function validateSize(size) {
@@ -36,14 +39,34 @@ export function normalizeHeroConfig(raw = {}) {
   validateSize(c.size);
   if (typeof c.model !== 'string' || !c.model) throw new Error('hero.model must be a model id');
   if (typeof c.quality !== 'string' || !c.quality) throw new Error('hero.quality must be a string');
+  if (!TIERS_ALLOWED.includes(c.tier)) throw new Error(`hero.tier must be one of ${TIERS_ALLOWED.join(', ')}, got ${JSON.stringify(c.tier)}`);
   if (typeof c.outputDir !== 'string' || !c.outputDir) throw new Error('hero.outputDir must be a path');
-  if (c.props === null || typeof c.props !== 'object' || Array.isArray(c.props)) throw new Error('hero.props must be an object mapping a prop name to a list of image paths');
-  for (const [name, paths] of Object.entries(c.props)) {
-    if (!Array.isArray(paths) || paths.some((p) => typeof p !== 'string' || !p)) throw new Error(`hero.props.${name} must be a list of image paths`);
-  }
+  if (c.props === null || typeof c.props !== 'object' || Array.isArray(c.props)) throw new Error('hero.props must be an object mapping a prop name to a list of image paths, or to { refs, gate }');
+  c.props = Object.fromEntries(Object.entries(c.props).map(([name, value]) => [name, normalizeProp(name, value)]));
   if (!Array.isArray(c.gate) || c.gate.some((g) => typeof g !== 'string')) throw new Error('hero.gate must be a list of strings, one assertion each');
   if (c.stylePack !== null && (typeof c.stylePack !== 'string' || !c.stylePack)) throw new Error('hero.stylePack must be a pack id or a path to a pack folder');
   return c;
+}
+
+/**
+ * One prop, in its one downstream shape: `{ refs: [paths], gate: [assertions] }`. A prop may be
+ * written as a bare list of photo paths (no gate of its own) or as that object. Throws naming
+ * the prop.
+ */
+export function normalizeProp(name, value) {
+  const bad = (what) => new Error(`hero.props.${name} ${what}`);
+  const isPaths = (v) => Array.isArray(v) && v.length > 0 && v.every((p) => typeof p === 'string' && p);
+  if (Array.isArray(value)) {
+    if (!isPaths(value)) throw bad('must be a non-empty list of image paths');
+    return { refs: [...value], gate: [] };
+  }
+  if (value && typeof value === 'object') {
+    if (!isPaths(value.refs)) throw bad('needs refs: a non-empty list of image paths');
+    const gate = value.gate === undefined ? [] : value.gate;
+    if (!Array.isArray(gate) || gate.some((g) => typeof g !== 'string')) throw bad('gate must be a list of strings, one assertion each');
+    return { refs: [...value.refs], gate: [...gate] };
+  }
+  throw bad('must be a list of image paths, or { refs, gate }');
 }
 
 function stripUndefined(o) {
@@ -87,6 +110,7 @@ export function migrateHeroRegister(legacy, root) {
       styleLine: legacy.register || 'An editorial illustration on a warm cream ground: soft painterly line, gentle shading, a muted natural palette, grounded and human.',
       rejectedPoles: [],
       gate: [],
+      pairings: Array.isArray(legacy.pairings) ? legacy.pairings : [],
       dir: root,
     };
   }
@@ -131,6 +155,7 @@ export function loadPack(dir) {
   pack.refs = Array.isArray(pack.refs) ? pack.refs : [];
   pack.rejectedPoles = Array.isArray(pack.rejectedPoles) ? pack.rejectedPoles : [];
   pack.gate = Array.isArray(pack.gate) ? pack.gate : [];
+  pack.pairings = Array.isArray(pack.pairings) ? pack.pairings : [];
   pack.palette = pack.palette && typeof pack.palette === 'object' ? pack.palette : null;
   pack.dir = dir;
   return pack;
@@ -138,7 +163,8 @@ export function loadPack(dir) {
 
 /**
  * The hero configuration of the wiki at `root`, with the pack resolved and loaded.
- * `{ root, stylePack, packDir, pack, layout, beats, size, model, quality, props, gate, outputDir }`.
+ * `{ root, stylePack, packDir, pack, layout, beats, size, model, quality, tier, props, gate, outputDir }`.
+ * Every prop under `props` is `{ refs, gate }`, whichever way the file wrote it.
  * `stylePack` is null and `packDir` is the wiki root for a migrated legacy block with no pack.
  * `root` is carried so a caller resolving relative prop paths never splices it in itself.
  */

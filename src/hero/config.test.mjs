@@ -169,3 +169,20 @@ test('props must map a name to a list of paths, and gate must be a list of strin
   assert.throws(() => readHeroConfig(wiki({ hero: { stylePack: 'p', props: { glasses: 'one.png' } } }), { env }), /props/);
   assert.throws(() => readHeroConfig(wiki({ hero: { stylePack: 'p', gate: 'open eyes' } }), { env }), /gate/);
 });
+
+test('readHeroConfig returns the wiki root, so callers never splice it in themselves', () => {
+  const packs = mkdtempSync(join(tmpdir(), 'packs-'));
+  pack(packs, 'plain');
+  const root = wiki({ hero: { stylePack: 'plain' } });
+  const c = readHeroConfig(root, { env: { WIKI_STYLE_PACKS: packs } });
+  assert.equal(c.root, root);
+  const legacy = wiki({ hero_register: { layout: 'grid', register: 'r' } });
+  assert.equal(readHeroConfig(legacy, { env: {} }).root, legacy);
+});
+
+test('a legacy hero_register with no layout key migrates to row, the shell door\'s old default, never to grid', () => {
+  const root = wiki({ hero_register: { register: 'r', defaultPanels: 3 } });
+  const c = readHeroConfig(root, { env: {} });
+  assert.equal(c.layout, 'row');
+  assert.equal(c.beats, 3);
+});

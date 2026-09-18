@@ -9,6 +9,10 @@ Run it on a laptop, never in a build:
 
     npm run optimize:images
     npm run optimize:images -- --dry-run
+    wiki optimize-images static/img/illustrations/capture.png   # only the files named
+
+Naming files limits the run to those files, which is how `wiki hero` publishes one hero
+without sweeping the rest of static/ in the same breath.
 
 WHY IT IS PYTHON AND THE GATE IS NODE. The gate runs on every Vercel build, so it carries no
 dependencies and reads image headers itself. The converter needs a real encoder, and adding
@@ -266,6 +270,17 @@ targets = [
     p for p in (ROOT / "static").rglob("*")
     if p.is_file() and p.suffix.lower() in IMAGE_EXT
 ]
+# Positional paths narrow the run to exactly those files. A path that is not an image under
+# static/ is refused rather than ignored, because a filter that matched nothing would print
+# "nothing to do" and read as success.
+only = [Path(a).resolve() for a in sys.argv[1:] if not a.startswith("--")]
+if only:
+    known = {p.resolve(): p for p in targets}
+    missing = [str(o) for o in only if o not in known]
+    if missing:
+        print("[optimize-images] not an image under static/: " + ", ".join(missing), file=sys.stderr)
+        sys.exit(2)
+    targets = [known[o] for o in only]
 work = [(p, needs_work(p)[0]) for p in targets]
 work = [(p, r) for p, r in work if r]
 

@@ -61,9 +61,11 @@ export function migrateHeroRegister(legacy, root) {
   if (stylePack && legacy.universe && !isAbsolute(stylePack) && existsSync(join(resolve(root, legacy.universe, stylePack), 'pack.json'))) {
     stylePack = resolve(root, legacy.universe, stylePack);
   }
+  // No layout key means the shell door's own default, which was one row, never the new grid
+  // default: a wiki that never chose a layout has been rendering rows all along.
   const hero = {
     stylePack,
-    layout: legacy.layout === undefined ? undefined : layoutMap[legacy.layout],
+    layout: legacy.layout === undefined ? 'row' : layoutMap[legacy.layout],
     beats: legacy.defaultPanels,
     size: legacy.size,
     model: legacy.model,
@@ -136,8 +138,9 @@ export function loadPack(dir) {
 
 /**
  * The hero configuration of the wiki at `root`, with the pack resolved and loaded.
- * `{ stylePack, packDir, pack, layout, beats, size, model, quality, props, gate, outputDir }`.
+ * `{ root, stylePack, packDir, pack, layout, beats, size, model, quality, props, gate, outputDir }`.
  * `stylePack` is null and `packDir` is the wiki root for a migrated legacy block with no pack.
+ * `root` is carried so a caller resolving relative prop paths never splices it in itself.
  */
 export function readHeroConfig(root, { env = process.env } = {}) {
   const file = join(root, 'wiki.config.json');
@@ -163,5 +166,5 @@ export function readHeroConfig(root, { env = process.env } = {}) {
     packDir = resolvePackDir(hero.stylePack, root, env);
     pack = loadPack(packDir);
   }
-  return { ...hero, packDir, pack };
+  return { ...hero, root, packDir, pack };
 }

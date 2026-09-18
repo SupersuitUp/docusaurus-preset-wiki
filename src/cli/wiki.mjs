@@ -85,8 +85,9 @@ function help() {
   upgrade [--to v]     bring a wiki on the package to the newest release, printing the CHANGELOG between
   gate set|status|link the password gate of the deployed wiki: set or rotate it through the Vercel API,
                        verify by read-back, redeploy, check the live site (wiki gate --help)
-  hero <slug> [...]    compile (and, when it ships, render) a page's hero through the wiki's Style Pack:
-                       --title, one --beat and one --label per panel, --prop, --dry-run (wiki hero --help)
+  hero <slug> [...]    render a page's hero through the wiki's Style Pack, read it back against the gate,
+                       and publish the WebP with its recipe: --title, --labels, --beats, --prop, --tier,
+                       --dry-run, --no-readback, --write, --json (wiki hero --help)
   icons                draw the favicon and PWA icon set from wiki.config.json (python3 + Pillow)
   optimize-images      WebP-convert and resize static images (python3 + Pillow)
 

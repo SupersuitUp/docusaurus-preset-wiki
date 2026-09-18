@@ -32,14 +32,14 @@ function site() {
   return { root, env: { WIKI_STYLE_PACKS: packs } };
 }
 
-const PAGE = ['--title', 'TWO BEATS', '--beat', 'A person opens a notebook.', '--beat', 'The notebook fills.', '--label', 'open', '--label', 'fill'];
+const PAGE = ['--title', 'TWO BEATS', '--beat', 'A person opens a notebook.', '--beat', 'The notebook fills.', '--label', 'A person opens the notebook', '--label', 'The notebook fills by itself'];
 
 test('parseHeroArgs collects repeatable beats, labels and props, and the pipe form of labels', () => {
   const a = parseHeroArgs(['my-page', ...PAGE, '--prop', 'glasses', '--dry-run']);
   assert.equal(a.slug, 'my-page');
   assert.equal(a.title, 'TWO BEATS');
   assert.deepEqual(a.beats, ['A person opens a notebook.', 'The notebook fills.']);
-  assert.deepEqual(a.labels, ['open', 'fill']);
+  assert.deepEqual(a.labels, ['A person opens the notebook', 'The notebook fills by itself']);
   assert.deepEqual(a.props, ['glasses']);
   assert.equal(a.dryRun, true);
   assert.deepEqual(parseHeroArgs(['p', '--labels', 'a|b|c']).labels, ['a', 'b', 'c']);
@@ -74,7 +74,7 @@ test('wiki hero --dry-run prints the compiled prompt, refs, strings and gate as 
   assert.match(out.prompt, /PROP references/);
   assert.deepEqual(out.refs.map((x) => x.role), ['anchor', 'style', 'prop']);
   assert.equal(out.refs[2].path, join(realpathSync(root), 'illustrations', 'props', 'glasses.png'));
-  assert.deepEqual(out.strings.map((s) => s.text), ['TWO BEATS', 'open', 'fill']);
+  assert.deepEqual(out.strings.map((s) => s.text), ['TWO BEATS', 'A person opens the notebook', 'The notebook fills by itself']);
   assert.equal(out.gate.at(-1), 'the glasses match the prop photo');
   assert.ok(out.gate.includes('muted palette'));
 });
@@ -247,7 +247,7 @@ test('--tier fast swaps in the flare model at high; --layout and --pack override
   assert.equal(argv[argv.indexOf('--model') + 1], 'gpt-image-2.5-flare');
   assert.equal(argv[argv.indexOf('--quality') + 1], 'high');
   assert.equal(argv[argv.indexOf('--size') + 1], '1536x1024', 'the fast tier never renders at the premium size');
-  const grid = ['--title', 'FOUR', '--beats', 'a|b|c|d', '--labels', '1|2|3|4'];
+  const grid = ['--title', 'FOUR', '--beats', 'a|b|c|d', '--labels', 'The first beat lands here|The second beat follows it|The third beat turns it|The fourth beat closes it'];
   const r2 = await capture(() => main(['g', ...grid, '--layout', 'grid', '--dry-run'], root, { env: { ...process.env, ...env } }));
   assert.equal(r2.code, 0);
   assert.match(JSON.parse(r2.stdout).prompt, /two columns and two rows/);

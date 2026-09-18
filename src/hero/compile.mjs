@@ -18,6 +18,10 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { normalizeProp, validateSize } from './config.mjs';
 
 /** The most style refs passed after the anchor. More than this and the anchor stops anchoring. */
+// A panel caption's length, in words. Under four reads as a tag; over twelve does not fit a band.
+const MIN_CAPTION_WORDS = 4;
+const MAX_CAPTION_WORDS = 12;
+
 const MAX_STYLE_REFS = 3;
 
 /** The word is banned in scene text family-wide: it reads as a tabletop and the model draws one. */
@@ -139,6 +143,13 @@ export function compileHero({ pack, config, title, labels, beats, props: rawProp
   if (!Array.isArray(labels)) throw new Error('labels are required: one per panel, in order');
   if (labels.length !== beats.length) throw new Error(`${labels.length} labels for ${beats.length} beats; give exactly one label per panel`);
   if (labels.some((l) => typeof l !== 'string' || !l.trim())) throw new Error('every label must be a non-empty string');
+  // A caption is a short plain sentence, never a one- or two-word tag. A hero shipped with
+  // bands reading "the phone" and "the glasses" on 2026-09-18 and Gary named the rule from
+  // his phone: short sentences in very plain language. The band can carry about twelve words.
+  labels.forEach((l, i) => {
+    const n = l.trim().split(/\s+/).length;
+    if (n < MIN_CAPTION_WORDS || n > MAX_CAPTION_WORDS) throw new Error(`caption ${i + 1} "${l}" has ${n} word${n === 1 ? '' : 's'}; a caption is a short plain sentence of four to twelve words`);
+  });
 
   // References: the anchor, then up to three more style refs, then the props in declared order.
   const packDir = pack.dir;

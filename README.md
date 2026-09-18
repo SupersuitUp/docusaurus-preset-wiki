@@ -157,10 +157,11 @@ when it carries its own read-back lines: those join the gate only on a render th
 so the wiki-wide `gate` holds only what is true of every hero. A rule about how a recurring subject
 is always shown belongs in the pack's `pairings` (a string, or the `{ rule, subject, shownAs }`
 entry the review frapp writes), which the compiler emits as one "Standing rules for every scene"
-block between the layout law and the beats. The page supplies the rest:
+block between the layout law and the beats. A caption is a short plain sentence of four to twelve
+words; one or two words is refused. The page supplies the rest:
 
 ```bash
-wiki hero capture --title "CAPTURE WITHOUT THE WALL" --labels "the phone|the glasses|the second angle|still there" \
+wiki hero capture --title "CAPTURE WITHOUT THE WALL" --labels "The phone is a wall between them|The glasses keep him in the moment|A second angle from the shelf|The photo is still there that night" \
   --beats "A father holds a phone up between himself and a toddler.|...|...|..." --prop smart-glasses --dry-run
 ```
 

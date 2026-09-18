@@ -25,8 +25,18 @@ function pack(overrides = {}) {
 const config = (extra = {}) => ({ layout: 'grid', beats: 4, size: '2560x1440', model: 'gpt-image-2.5-sunburst', quality: 'xhigh', props: {}, gate: [], outputDir: 'static/img/illustrations', ...extra });
 
 const FOUR = ['A father opens a notebook.', 'The notebook fills with dated pages.', 'A machine reads the pages.', 'A printed album lands on the table.'];
-const FOUR_LABELS = ['capture', 'annotate', 'own', 'project'];
+const FOUR_LABELS = ['The glasses capture the moment', 'The machine labels it overnight', 'The album prints itself', 'Grandma gets it on her phone'];
 const page = (extra = {}) => ({ pack: pack(), config: config(), title: 'HYPERDOCUMENTATION', labels: FOUR_LABELS, beats: FOUR, props: {}, ...extra });
+
+// A caption is a short plain sentence, never a one- or two-word tag (Gary, 2026-09-18, on the
+// phone, after a hero shipped with bands reading "the phone" and "the glasses": "our panel
+// captions be short sentences in very plain language not just 1-2 words"). The frapp writes
+// them that way; the compiler refuses the other shape so no wiki can render it by hand.
+test('a caption under four words is refused, and a caption over twelve is refused, with the offender named', () => {
+  assert.throws(() => compileHero(page({ labels: ['the phone', ...FOUR_LABELS.slice(1)] })), /caption 1 "the phone" has 2 words; a caption is a short plain sentence of four to twelve words/);
+  assert.throws(() => compileHero(page({ labels: [...FOUR_LABELS.slice(0, 3), 'a caption that runs on and on far past the twelve words a band can carry'] })), /caption 4 .* has 16 words/);
+  assert.doesNotThrow(() => compileHero(page({ labels: ['Four words is fine', ...FOUR_LABELS.slice(1)] })));
+});
 
 test('the prompt carries its sections in order: style and palette, layout law, beats, text law, negatives', () => {
   const { prompt } = compileHero(page());
@@ -82,15 +92,15 @@ test('a hero is a strip of at least two beats', () => {
 test('the text law names the title and every label verbatim and nothing else', () => {
   const { prompt, strings } = compileHero(page());
   assert.match(prompt, /TITLE BAR across the very top of the whole image reading "HYPERDOCUMENTATION" in bold, chunky, hand-inked capitals/);
-  assert.match(prompt, /Label the panels, in order, with these exact words: "capture", "annotate", "own", "project"/);
+  assert.match(prompt, /Label the panels, in order, with these exact words: "The glasses capture the moment", "The machine labels it overnight", "The album prints itself", "Grandma gets it on her phone"/);
   assert.match(prompt, /Each label sits in a small clean band at the top of its own panel/);
   assert.match(prompt, /That title and those labels are the ONLY text permitted/);
   assert.deepEqual(strings, [
     { text: 'HYPERDOCUMENTATION', placement: 'title-bar' },
-    { text: 'capture', placement: 'panel-1-label' },
-    { text: 'annotate', placement: 'panel-2-label' },
-    { text: 'own', placement: 'panel-3-label' },
-    { text: 'project', placement: 'panel-4-label' },
+    { text: 'The glasses capture the moment', placement: 'panel-1-label' },
+    { text: 'The machine labels it overnight', placement: 'panel-2-label' },
+    { text: 'The album prints itself', placement: 'panel-3-label' },
+    { text: 'Grandma gets it on her phone', placement: 'panel-4-label' },
   ]);
 });
 

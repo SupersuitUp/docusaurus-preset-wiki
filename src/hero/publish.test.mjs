@@ -26,11 +26,11 @@ function render() {
   const d = mkdtempSync(join(tmpdir(), 'render-'));
   const png = join(d, 'round-2.png');
   writeFileSync(png, 'png');
-  writeFileSync(`${png}.recipe.json`, JSON.stringify({ model: 'gpt-image-2.5-sunburst', prompt: 'p', refs: [{ path: '/a.png' }], timestamp: '2026-09-18T00:00:00Z', asset: png }));
+  writeFileSync(`${png}.recipe.json`, JSON.stringify({ model: 'gpt-image-2.5-sunburst', prompt: 'the whole prompt, verbatim', refs: [{ path: '/Users/someone/packs/warm/refs/a.png' }], timestamp: '2026-09-18T00:00:00Z', asset: png }));
   return { png, recipe: `${png}.recipe.json` };
 }
 
-const READBACK = { rounds: 2, verdicts: [{ assertion: 'x', verdict: 'PASS', note: '' }] };
+const READBACK = { rounds: 2, verdicts: [{ assertion: 'x', verdict: 'PASS', note: '' }], vision: 'gpt-5.5', publishedFrom: '/private/tmp/wiki-hero-capture-abc/round-2.png', overruled: false };
 
 test('heroUrl maps an outputDir under static/ to the site path, and refuses one outside it', () => {
   assert.equal(heroUrl('static/img/illustrations', 'capture'), '/img/illustrations/capture.webp');
@@ -38,23 +38,65 @@ test('heroUrl maps an outputDir under static/ to the site path, and refuses one 
   assert.throws(() => heroUrl('img/heroes', 'x'), /static/);
 });
 
-test('publishHero copies the png and its recipe beside the webp, adds readback to the recipe, runs the optimizer on that one file, and prints the two lines', async () => {
+test('publishHero keeps the full-size png and its full recipe under illustrations/, serves a derive record beside the webp, runs the optimizer on that one file, and prints the two lines', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wiki-'));
   const { png, recipe } = render();
   const calls = [];
-  const r = await publishHero({ png, recipe, slug: 'capture', outputDir: 'static/img/illustrations', root, alt: 'Two-panel strip', readback: READBACK, optimize: (rt, files) => { calls.push([rt, files]); return fakeOptimize(rt, files); } });
+  const r = await publishHero({ png, recipe, slug: 'capture', outputDir: 'static/img/illustrations', root, alt: 'Two-panel strip', readback: READBACK, extra: { stylePack: 'warm', wikiHero: { slug: 'capture', title: 'T', labels: ['a', 'b'], beats: ['one', 'two'] } }, optimize: (rt, files) => { calls.push([rt, files]); return fakeOptimize(rt, files); } });
   assert.equal(r.webp, join(root, 'static', 'img', 'illustrations', 'capture.webp'));
   assert.equal(r.recipeOut, `${r.webp}.recipe.json`);
   assert.ok(existsSync(r.webp));
   assert.ok(!existsSync(join(root, 'static', 'img', 'illustrations', 'capture.png')), 'the png does not linger beside the webp');
   assert.deepEqual(calls, [[root, [join(root, 'static', 'img', 'illustrations', 'capture.png')]]]);
-  const out = JSON.parse(readFileSync(r.recipeOut, 'utf8'));
-  assert.deepEqual(out.readback, READBACK);
-  assert.equal(out.model, 'gpt-image-2.5-sunburst');
-  assert.equal(out.asset, 'static/img/illustrations/capture.webp');
   assert.equal(r.frontmatterLine, 'image: "/img/illustrations/capture.webp"');
   assert.equal(r.bodyLine, '![Two-panel strip](/img/illustrations/capture.webp)');
   assert.ok(existsSync(png), 'the source render is left where it was');
+
+  // The full-size source survives approval: the plan's "the full-size source stays in
+  // illustrations/<slug>.png with its recipe". Before this the only copy went under static/,
+  // the optimizer unlinked it, and the 2560-wide render existed nowhere afterwards.
+  assert.equal(r.sourcePng, join(root, 'illustrations', 'capture.png'));
+  assert.equal(r.sourceRecipe, `${r.sourcePng}.recipe.json`);
+  assert.equal(readFileSync(r.sourcePng, 'utf8'), 'png');
+  const full = JSON.parse(readFileSync(r.sourceRecipe, 'utf8'));
+  assert.equal(full.asset, 'illustrations/capture.png', 'asset is repo-relative');
+  assert.equal(full.model, 'gpt-image-2.5-sunburst');
+  assert.equal(full.prompt, 'the whole prompt, verbatim');
+  assert.deepEqual(full.refs, [{ path: '/Users/someone/packs/warm/refs/a.png' }], 'the full recipe keeps everything the adapter wrote');
+  assert.deepEqual(full.readback, READBACK);
+  assert.equal(full.stylePack, 'warm');
+  assert.equal(full.wikiHero.title, 'T');
+
+  // The SERVED sidecar is a derive record: it points back at the source and carries no prompt
+  // and no path off this repo. It is a public file on a public site.
+  const out = JSON.parse(readFileSync(r.recipeOut, 'utf8'));
+  assert.equal(out.mode, 'derive');
+  assert.equal(out.derivedFrom, 'illustrations/capture.png');
+  assert.equal(out.sourceRecipe, 'illustrations/capture.png.recipe.json');
+  assert.match(out.generator, /optimize-images/);
+  assert.match(out.generatedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(out.asset, 'static/img/illustrations/capture.webp');
+  assert.deepEqual(out.readback, { rounds: 2, overruled: false, verdicts: [{ assertion: 'x', verdict: 'PASS', note: '' }] });
+  assert.equal(out.stylePack, 'warm');
+  assert.equal(out.wikiHero.title, 'T');
+  assert.equal(out.prompt, undefined);
+  assert.equal(out.refs, undefined);
+  assert.equal(out.model, undefined);
+  const served = readFileSync(r.recipeOut, 'utf8');
+  assert.doesNotMatch(served, /\/Users\//);
+  assert.doesNotMatch(served, /\/private\//);
+  assert.doesNotMatch(served, /"prompt"/);
+});
+
+test('an overruled read-back is recorded as such in the served record, and a DEFECT verdict travels with it', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wiki-'));
+  const { png, recipe } = render();
+  const readback = { rounds: 3, verdicts: [{ assertion: 'eyes open', verdict: 'DEFECT', note: 'turned away' }], overruled: true, publishedFrom: '/private/tmp/x/round-3.png' };
+  const r = await publishHero({ png, recipe, slug: 'capture', outputDir: 'static/img/illustrations', root, alt: 'a', readback, optimize: fakeOptimize });
+  const out = JSON.parse(readFileSync(r.recipeOut, 'utf8'));
+  assert.deepEqual(out.readback, { rounds: 3, overruled: true, verdicts: [{ assertion: 'eyes open', verdict: 'DEFECT', note: 'turned away' }] });
+  assert.doesNotMatch(readFileSync(r.recipeOut, 'utf8'), /\/private\//);
+  assert.equal(JSON.parse(readFileSync(r.sourceRecipe, 'utf8')).readback.publishedFrom, '/private/tmp/x/round-3.png', 'the full record keeps where it came from');
 });
 
 test('the published recipe passes the preset\'s own provenance gate', async () => {
@@ -65,8 +107,9 @@ test('the published recipe passes the preset\'s own provenance gate', async () =
   const r = spawnSync(process.execPath, [check, root, '--json'], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const summary = JSON.parse(r.stdout);
-  assert.equal(summary.covered, 1);
+  assert.equal(summary.covered, 2, 'the served webp and the illustrations/ source both carry a valid recipe');
   assert.equal(summary.invalid, 0);
+  assert.equal(summary.missing, 0);
 });
 
 test('publishHero refuses when the optimizer fails or leaves no webp behind', async () => {

@@ -15,7 +15,10 @@
 // Exit codes: 0 published; 1 a refusal or an error; 2 usage; 3 a DEFECT survived every round
 // (nothing published; the rounds are left in the work dir for a person to look at). When the
 // person has looked and overrules the gate, `--publish <png>` publishes that round as it is,
-// rendering nothing and asking nothing, and the recipe records that it was published that way.
+// rendering nothing and asking nothing, and the recipe records that it was published that way
+// (`overruled` only when a DEFECT was published over). Publishing writes the full-size render
+// and its full recipe under illustrations/ and a derive record beside the served webp.
+
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
@@ -56,7 +59,7 @@ const HELP = `wiki hero <slug> --title "<words>" --labels "a|b|c|d" --beats "<be
                     overrules the gate; recorded in the recipe
   --write           patch the page: image: in its frontmatter, the image line under its definition
   --page <path>     the page --write patches, when the slug alone is ambiguous
-  --json            print one object: { png, webp, recipe, verdicts, rounds }; progress goes to stderr
+  --json            print one object: { png, webp, recipe, sourcePng, sourceRecipe, verdicts, rounds }; progress goes to stderr
 
 Run from the wiki root. The pack comes from hero.stylePack: a path, or an id looked up in
 $WIKI_STYLE_PACKS and then ../wiki-style-packs/packs beside the wiki. The render goes through the
@@ -227,6 +230,7 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
     log(`rendering ${args.slug} through ${adapter.kind} (${model}, ${size}, ${quality}); rounds in ${workDir}`);
   }
 
+  const visionModel = env.WIKI_HERO_VISION_MODEL || DEFAULT_VISION_MODEL;
   let prompt = compiled.prompt;
   // Every defect any round has produced, by assertion, with its latest note. A round is told
   // about all of them, not only the last round's: a re-roll that fixed round 1's defect can
@@ -244,8 +248,9 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
     verdicts = await readBack(png, gate, compiled.strings, { vision: deps.vision, env });
     history.push({ round, png, verdicts });
     // Beside the round, ABU's own convention, so a person looking at a refused round sees what
-    // refused it, and `--publish` can carry those verdicts into the recipe as overruled.
-    writeFileSync(`${png}.readback.json`, `${JSON.stringify({ round, verdicts }, null, 2)}\n`);
+    // refused it, and `--publish` can carry those verdicts and the model that gave them into
+    // the recipe rather than reporting the vision as skipped.
+    writeFileSync(`${png}.readback.json`, `${JSON.stringify({ round, vision: visionModel, verdicts }, null, 2)}\n`);
     const defects = verdicts.filter((v) => v.verdict === 'DEFECT');
     for (const v of verdicts) log(`  ${v.verdict.padEnd(6)} ${v.assertion}${v.note ? `  (${v.note})` : ''}`);
     if (!defects.length) break;
@@ -264,7 +269,10 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
   let readback;
   if (args.publish) {
     // The verdicts written beside the round when it was read back, so the recipe and --json
-    // both say what was overruled, and which round it was.
+    // both say which round it was and what it was read back with. An OVERRULE is publishing
+    // over a DEFECT; a round that read back clean and was published from the file is not one
+    // (every clean frapp approval was recorded as an overrule before 2026-09-18, because the
+    // readback file's mere presence was the test).
     const beside = `${png}.readback.json`;
     const looked = existsSync(beside) ? JSON.parse(readFileSync(beside, 'utf8')) : null;
     verdicts = Array.isArray(looked?.verdicts) ? looked.verdicts : [];
@@ -272,11 +280,12 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
     readback = {
       rounds: round,
       verdicts,
-      vision: 'skipped: published from an existing render by the operator (--publish)',
+      vision: typeof looked?.vision === 'string' && looked.vision ? looked.vision : 'skipped: no read-back beside the render',
+      published: 'by the operator from an existing render (--publish): no new render, no new read-back',
       publishedFrom: png,
-      ...(looked ? { overruled: true } : {}),
+      overruled: verdicts.some((v) => v.verdict === 'DEFECT'),
     };
-  } else readback = { rounds: round, verdicts, ...(history.length ? { history } : {}), vision: args.readback ? (env.WIKI_HERO_VISION_MODEL || DEFAULT_VISION_MODEL) : 'skipped' };
+  } else readback = { rounds: round, verdicts, ...(history.length ? { history } : {}), vision: args.readback ? visionModel : 'skipped', overruled: false };
   const published = await publishHero({
     png, recipe, slug: args.slug, outputDir: config.outputDir, root, alt, readback,
     extra: {
@@ -287,7 +296,7 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
   });
   log(`published ${published.webp}`);
   if (args.json) {
-    console.log(JSON.stringify({ png, webp: published.webp, recipe: published.recipeOut, verdicts, rounds: round, history, workDir, pageWritten: published.pageWritten }, null, 2));
+    console.log(JSON.stringify({ png, webp: published.webp, recipe: published.recipeOut, sourcePng: published.sourcePng, sourceRecipe: published.sourceRecipe, verdicts, rounds: round, history, workDir, pageWritten: published.pageWritten }, null, 2));
     return 0;
   }
   console.log(published.pageWritten

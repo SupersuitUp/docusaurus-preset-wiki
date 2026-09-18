@@ -176,8 +176,19 @@ test('end to end: compile, render, read back clean, publish; --json prints png, 
   const recipe = JSON.parse(readFileSync(out.recipe, 'utf8'));
   assert.equal(recipe.readback.rounds, 1);
   assert.deepEqual(recipe.readback.verdicts, out.verdicts);
+  assert.equal(recipe.readback.overruled, false, 'a clean read-back is not an overrule');
   assert.equal(recipe.stylePack, 'plain');
   assert.equal(recipe.wikiHero.slug, 'my-page');
+  assert.equal(recipe.mode, 'derive');
+  assert.equal(recipe.prompt, undefined, 'the served record carries no prompt');
+  assert.equal(out.sourcePng, join(root, 'illustrations', 'my-page.png'));
+  assert.equal(out.sourceRecipe, `${out.sourcePng}.recipe.json`);
+  assert.ok(existsSync(out.sourcePng), 'the full-size render survives publishing');
+  const full = JSON.parse(readFileSync(out.sourceRecipe, 'utf8'));
+  assert.equal(full.prompt, 'p');
+  assert.equal(full.readback.vision, 'gpt-5.5', 'the full record names the vision model');
+  const beside = JSON.parse(readFileSync(`${out.png}.readback.json`, 'utf8'));
+  assert.equal(beside.vision, 'gpt-5.5', 'the read-back beside the round records which model looked, so --publish can carry it');
 });
 
 test('a DEFECT re-rolls with the notes appended as corrections, up to three rounds, and the recipe records every round', async () => {
@@ -195,8 +206,10 @@ test('a DEFECT re-rolls with the notes appended as corrections, up to three roun
   assert.equal(log.renders[2].prompt.match(/opne/g).length, 1, 'one line per assertion, never a duplicate');
   const recipe = JSON.parse(readFileSync(out.recipe, 'utf8'));
   assert.equal(recipe.readback.rounds, 3);
-  assert.equal(recipe.readback.history.length, 3);
-  assert.equal(recipe.readback.history[0].verdicts.filter((v) => v.verdict === 'DEFECT').length, 1);
+  assert.equal(recipe.readback.history, undefined, 'the served summary does not repeat every round');
+  const full = JSON.parse(readFileSync(out.sourceRecipe, 'utf8'));
+  assert.equal(full.readback.history.length, 3);
+  assert.equal(full.readback.history[0].verdicts.filter((v) => v.verdict === 'DEFECT').length, 1);
 });
 
 test('a DEFECT that survives every round publishes nothing, prints the verdicts, and exits 3', async () => {
@@ -269,7 +282,7 @@ test('--publish <png> publishes a render a person has already looked at: no adap
   const png = join(dir, 'round-3.png');
   writeFileSync(png, 'png');
   writeFileSync(`${png}.recipe.json`, JSON.stringify({ model: 'm', prompt: 'p', refs: [], timestamp: 't' }));
-  writeFileSync(`${png}.readback.json`, JSON.stringify({ round: 3, verdicts: [{ assertion: 'eyes open', verdict: 'DEFECT', note: 'turned away' }] }));
+  writeFileSync(`${png}.readback.json`, JSON.stringify({ round: 3, vision: 'gpt-5.5', verdicts: [{ assertion: 'eyes open', verdict: 'DEFECT', note: 'turned away' }] }));
   const { code, stdout } = await capture(() => main(['my-page', ...PAGE, '--publish', png, '--json'], root, { ...deps, env: { ...process.env, ...env } }));
   assert.equal(code, 0, stdout);
   const out = JSON.parse(stdout);
@@ -279,13 +292,45 @@ test('--publish <png> publishes a render a person has already looked at: no adap
   assert.equal(out.rounds, 3, 'the round the published png came from');
   assert.deepEqual(out.verdicts, [{ assertion: 'eyes open', verdict: 'DEFECT', note: 'turned away' }], '--json shows what the recipe says');
   assert.ok(existsSync(out.webp));
-  const recipe = JSON.parse(readFileSync(out.recipe, 'utf8'));
-  assert.equal(recipe.readback.rounds, 3);
-  assert.equal(recipe.readback.publishedFrom, png);
-  assert.match(recipe.readback.vision, /operator/);
-  assert.equal(recipe.readback.overruled, true);
-  assert.deepEqual(recipe.readback.verdicts, [{ assertion: 'eyes open', verdict: 'DEFECT', note: 'turned away' }], 'the verdicts the person overruled travel with the asset');
+  const full = JSON.parse(readFileSync(out.sourceRecipe, 'utf8'));
+  assert.equal(full.readback.rounds, 3);
+  assert.equal(full.readback.publishedFrom, png);
+  assert.equal(full.readback.vision, 'gpt-5.5', 'the model that read the round back, carried from the readback file rather than reported as skipped');
+  assert.match(full.readback.published, /operator/);
+  assert.equal(full.readback.overruled, true, 'a DEFECT the person published over is an overrule');
+  assert.deepEqual(full.readback.verdicts, [{ assertion: 'eyes open', verdict: 'DEFECT', note: 'turned away' }], 'the verdicts the person overruled travel with the asset');
+  const served = JSON.parse(readFileSync(out.recipe, 'utf8'));
+  assert.equal(served.readback.overruled, true);
+  assert.equal(served.readback.publishedFrom, undefined, 'the served record names no path off the repo');
   await assert.rejects(main(['my-page', ...PAGE, '--publish', join(dir, 'nope.png')], root, { ...deps, env: { ...process.env, ...env } }), /nope\.png/);
+});
+
+test('--publish of a round whose read-back was clean is NOT an overrule; without a readback file the vision is recorded as skipped', async () => {
+  const { root, env } = site();
+  const { deps } = fakes();
+  const dir = mkdtempSync(join(tmpdir(), 'looked-'));
+  const png = join(dir, 'round-1.png');
+  writeFileSync(png, 'png');
+  writeFileSync(`${png}.recipe.json`, JSON.stringify({ model: 'm', prompt: 'p', refs: [], timestamp: 't' }));
+  writeFileSync(`${png}.readback.json`, JSON.stringify({ round: 1, vision: 'gpt-5.5', verdicts: [{ assertion: 'eyes open', verdict: 'PASS', note: 'ok' }] }));
+  const { code, stdout } = await capture(() => main(['my-page', ...PAGE, '--publish', png, '--json'], root, { ...deps, env: { ...process.env, ...env } }));
+  assert.equal(code, 0, stdout);
+  const out = JSON.parse(stdout);
+  const full = JSON.parse(readFileSync(out.sourceRecipe, 'utf8'));
+  assert.equal(full.readback.overruled, false, 'every clean frapp approval used to be recorded as an overrule because a readback file sat beside the png');
+  assert.equal(full.readback.rounds, 1);
+  assert.equal(full.readback.vision, 'gpt-5.5');
+  assert.equal(JSON.parse(readFileSync(out.recipe, 'utf8')).readback.overruled, false);
+
+  const bare = join(dir, 'round-2.png');
+  writeFileSync(bare, 'png');
+  writeFileSync(`${bare}.recipe.json`, JSON.stringify({ model: 'm', prompt: 'p', refs: [], timestamp: 't' }));
+  const r2 = await capture(() => main(['other-page', ...PAGE, '--publish', bare, '--json'], root, { ...deps, env: { ...process.env, ...env } }));
+  assert.equal(r2.code, 0, r2.stdout);
+  const full2 = JSON.parse(readFileSync(JSON.parse(r2.stdout).sourceRecipe, 'utf8'));
+  assert.equal(full2.readback.overruled, false);
+  assert.equal(full2.readback.rounds, 0);
+  assert.match(full2.readback.vision, /skipped/);
 });
 
 test('--json on a surviving DEFECT and on success both carry the per-round history', async () => {

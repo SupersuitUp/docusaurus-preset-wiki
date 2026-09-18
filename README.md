@@ -170,11 +170,15 @@ Universe on-brand-image adapter (`$ABU_ADAPTER`, else the newest installed `abu`
 back to the wiki's own `illustrations/scripts/generate.py`; the PNG is read back against every gate
 line and the spelling of every declared string by a vision model (`OPENAI_API_KEY`,
 `WIKI_HERO_VISION_MODEL`); a DEFECT re-rolls with the defect named as a correction, up to three
-rounds; the winner is converted to a WebP at most 1536 wide by the same optimizer the weight gate
-trusts and published beside its recipe, which now carries `readback`. `--write` puts the two
-lines into the page; `--json` prints `{ png, webp, recipe, verdicts, rounds }`. A DEFECT that
-survives every round publishes nothing and exits 3, leaving the rounds and their verdicts on disk;
-a person who looks and disagrees publishes that round with `--publish <png>`, and the recipe says so.
+rounds; the winner is kept full size as `illustrations/<slug>.png` with its full recipe (model,
+exact prompt, every ref, the read-back in full) beside it, and converted to a WebP at most 1536
+wide by the same optimizer the weight gate trusts, served with a derive record that names the
+source and the tool and summarises the read-back (`{ rounds, overruled, verdicts }`) and carries
+no prompt and no path off the repo. `--write` puts the two lines into the page; `--json` prints
+`{ png, webp, recipe, sourcePng, sourceRecipe, verdicts, rounds }`. A DEFECT that survives every
+round publishes nothing and exits 3, leaving the rounds and their verdicts on disk; a person who
+looks and disagrees publishes that round with `--publish <png>`, and the recipe records
+`overruled: true` only when a DEFECT was published over.
 
 ## Overriding one component
 

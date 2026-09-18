@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { buildAssertions, parseVerdicts, readBack, counterClauses } from './readback.mjs';
+import { buildAssertions, parseVerdicts, readBack, counterClauses, defaultVision } from './readback.mjs';
 
 const GATE = ["every person's eyes are open", 'exactly 2 panels'];
 const STRINGS = [{ text: 'TWO BEATS', placement: 'title-bar' }, { text: 'open', placement: 'panel-1-label' }, { text: 'fill', placement: 'panel-2-label' }];
@@ -76,4 +76,46 @@ test('counterClauses turns the DEFECT notes into one correction block the next p
   assert.match(block, /exactly 2 panels[\s\S]*three panels drawn/);
   assert.doesNotMatch(block, /eyes open/);
   assert.equal(counterClauses(verdicts.filter((v) => v.verdict === 'PASS')), '');
+});
+
+test('defaultVision posts the png as a data URL with the numbered questions under a strict json_schema format, and returns the output_text', async () => {
+  const png = join(mkdtempSync(join(tmpdir(), 'rb-')), 'r.png');
+  writeFileSync(png, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  let seen;
+  const fetchImpl = async (url, init) => {
+    seen = { url, init };
+    return { ok: true, status: 200, json: async () => ({ status: 'completed', output: [
+      { type: 'reasoning', summary: [] },
+      { type: 'message', content: [{ type: 'output_text', text: '{"verdicts":[{"index":1,"verdict":"PASS","note":"ok"}]}' }] },
+    ] }) };
+  };
+  const text = await defaultVision({ png, questions: ['1. eyes open'], env: { OPENAI_API_KEY: 'sk-test-key', WIKI_HERO_VISION_MODEL: 'vision-x' }, fetchImpl });
+  assert.equal(text, '{"verdicts":[{"index":1,"verdict":"PASS","note":"ok"}]}');
+  assert.equal(seen.url, 'https://api.openai.com/v1/responses');
+  assert.equal(seen.init.method, 'POST');
+  assert.equal(seen.init.headers.authorization, 'Bearer sk-test-key');
+  const body = JSON.parse(seen.init.body);
+  assert.equal(body.model, 'vision-x');
+  const content = body.input[0].content;
+  assert.equal(body.input[0].role, 'user');
+  assert.match(content[0].text, /1\. eyes open/);
+  assert.equal(content[1].type, 'input_image');
+  assert.equal(content[1].image_url, `data:image/png;base64,${Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64')}`);
+  assert.equal(body.text.format.type, 'json_schema');
+  assert.equal(body.text.format.strict, true);
+  assert.deepEqual(body.text.format.schema.properties.verdicts.items.properties.verdict.enum, ['PASS', 'DEFECT']);
+  assert.deepEqual(body.text.format.schema.required, ['verdicts']);
+});
+
+test('defaultVision refuses without a key, and an API error never carries the key', async () => {
+  const png = join(mkdtempSync(join(tmpdir(), 'rb-')), 'r.png');
+  writeFileSync(png, 'png');
+  await assert.rejects(defaultVision({ png, questions: ['1. x'], env: {}, fetchImpl: async () => { throw new Error('must not be called'); } }), /OPENAI_API_KEY/);
+  const key = 'sk-secret-value';
+  const fetchImpl = async () => ({ ok: false, status: 401, statusText: 'Unauthorized', json: async () => ({ error: { message: `Incorrect API key provided: ${key}` } }) });
+  await assert.rejects(defaultVision({ png, questions: ['1. x'], env: { OPENAI_API_KEY: key }, fetchImpl }), (e) => {
+    assert.match(e.message, /401/);
+    assert.doesNotMatch(e.message, /sk-secret-value/);
+    return true;
+  });
 });

@@ -29,10 +29,10 @@ import { publishHero } from '../hero/publish.mjs';
 /** The most renders one hero gets. The first plus two re-rolls; each round is a paid render. */
 export const MAX_ROUNDS = 3;
 
-/** `best` is the wiki's own configured model and quality; `fast` is the cheaper draft tier. */
+/** `best` is the wiki's own configured model, quality and size; `fast` is the cheaper draft tier at the draft size. */
 export const TIERS = Object.freeze({
   best: null,
-  fast: Object.freeze({ model: 'gpt-image-2.5-flare', quality: 'high' }),
+  fast: Object.freeze({ model: 'gpt-image-2.5-flare', quality: 'high', size: '1536x1024' }),
 });
 
 const HELP = `wiki hero <slug> --title "<words>" --labels "a|b|c|d" --beats "<beat>|<beat>|..." [options]
@@ -47,7 +47,7 @@ const HELP = `wiki hero <slug> --title "<words>" --labels "a|b|c|d" --beats "<be
                     an ad hoc prop photo for this page only, relative to the wiki root
   --pack <id|path>  use this Style Pack instead of hero.stylePack
   --layout grid|row override hero.layout (a grid takes exactly four beats)
-  --tier best|fast  best (default) is hero.model at hero.quality; fast is ${TIERS.fast.model} at ${TIERS.fast.quality}
+  --tier best|fast  best (default) is hero.model at hero.quality and hero.size; fast is ${TIERS.fast.model} at ${TIERS.fast.quality}, ${TIERS.fast.size}
   --dry-run         print the compiled prompt, refs, strings and gate as JSON; no API call
   --no-readback     render once and publish without the vision check
   --publish <png>   publish this already-rendered round (its recipe beside it) without rendering
@@ -155,7 +155,13 @@ const log = (...m) => console.error('[hero]', ...m);
  */
 export async function main(argv = process.argv.slice(2), root = process.cwd(), deps = {}) {
   const env = deps.env ?? process.env;
-  const args = parseHeroArgs(argv);
+  let args;
+  try {
+    args = parseHeroArgs(argv);
+  } catch (e) {
+    console.error(`[hero] ${e.message} (see wiki hero --help)`);
+    return 2;
+  }
   if (args.help || argv.length === 0) { console.log(HELP); return 0; }
   if (!args.slug) { console.error('[hero] a page slug is required (see wiki hero --help)'); return 2; }
 
@@ -169,6 +175,7 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
   const tier = TIERS[args.tier];
   const model = tier?.model ?? config.model;
   const quality = tier?.quality ?? config.quality;
+  const size = tier?.size ?? config.size;
 
   const props = selectProps(args.props, config.props);
   for (const [name, paths] of Object.entries(args.adHocProps)) {
@@ -184,7 +191,7 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
     console.log(JSON.stringify({
       slug: args.slug,
       layout: config.layout,
-      size: config.size,
+      size,
       model,
       quality,
       out: `${config.outputDir}/${args.slug}.webp`,
@@ -214,15 +221,19 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
     adapter = deps.adapter ?? resolveAdapter({ env, root, home: deps.home });
     if (adapter.note) log(adapter.note);
     workDir = mkdtempSync(join(tmpdir(), `wiki-hero-${args.slug.replace(/\//g, '-')}-`));
-    log(`rendering ${args.slug} through ${adapter.kind} (${model}, ${config.size}, ${quality}); rounds in ${workDir}`);
+    log(`rendering ${args.slug} through ${adapter.kind} (${model}, ${size}, ${quality}); rounds in ${workDir}`);
   }
 
   let prompt = compiled.prompt;
+  // Every defect any round has produced, by assertion, with its latest note. A round is told
+  // about all of them, not only the last round's: a re-roll that fixed round 1's defect can
+  // regress on it in round 3 if nobody keeps saying it.
+  const openDefects = new Map();
   while (!args.publish && round < MAX_ROUNDS) {
     round += 1;
     log(`round ${round} of ${MAX_ROUNDS}`);
     const out = join(workDir, `round-${round}.png`);
-    ({ png, recipe } = await renderHero({ ...compiled, prompt }, { adapter, out, model, size: config.size, quality, run: deps.run, cwd: root }));
+    ({ png, recipe } = await renderHero({ ...compiled, prompt }, { adapter, out, model, size, quality, run: deps.run, cwd: root }));
     if (!args.readback) { verdicts = []; break; }
     const written = JSON.parse(readFileSync(recipe, 'utf8'));
     const guardGate = Array.isArray(written.guardGate) ? written.guardGate.filter((g) => typeof g === 'string') : [];
@@ -235,7 +246,8 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
     const defects = verdicts.filter((v) => v.verdict === 'DEFECT');
     for (const v of verdicts) log(`  ${v.verdict.padEnd(6)} ${v.assertion}${v.note ? `  (${v.note})` : ''}`);
     if (!defects.length) break;
-    prompt = `${compiled.prompt}\n\n${counterClauses(verdicts)}`;
+    for (const d of defects) openDefects.set(d.assertion, d);
+    prompt = `${compiled.prompt}\n\n${counterClauses([...openDefects.values()])}`;
     if (round < MAX_ROUNDS) log(`${defects.length} defect(s); re-rolling with them as corrections`);
   }
 
@@ -248,11 +260,15 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
 
   let readback;
   if (args.publish) {
+    // The verdicts written beside the round when it was read back, so the recipe and --json
+    // both say what was overruled, and which round it was.
     const beside = `${png}.readback.json`;
     const looked = existsSync(beside) ? JSON.parse(readFileSync(beside, 'utf8')) : null;
+    verdicts = Array.isArray(looked?.verdicts) ? looked.verdicts : [];
+    round = Number.isInteger(looked?.round) ? looked.round : 0;
     readback = {
-      rounds: 0,
-      verdicts: Array.isArray(looked?.verdicts) ? looked.verdicts : [],
+      rounds: round,
+      verdicts,
       vision: 'skipped: published from an existing render by the operator (--publish)',
       publishedFrom: png,
       ...(looked ? { overruled: true } : {}),

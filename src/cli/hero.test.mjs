@@ -110,7 +110,7 @@ test('parseHeroArgs takes the Task 3 flags: --beats, --beats-file, --pack, --lay
 
 test('the tiers: best is the wiki\'s configured model and quality, fast is the flare model at high', () => {
   assert.equal(TIERS.best, null);
-  assert.deepEqual(TIERS.fast, { model: 'gpt-image-2.5-flare', quality: 'high' });
+  assert.deepEqual(TIERS.fast, { model: 'gpt-image-2.5-flare', quality: 'high', size: '1536x1024' });
 });
 
 /** Fakes for an in-process run: an adapter that draws a png, a vision that answers as told, an optimizer without Pillow. */
@@ -191,7 +191,8 @@ test('a DEFECT re-rolls with the notes appended as corrections, up to three roun
   assert.doesNotMatch(log.renders[0].prompt, /CORRECTIONS/);
   assert.match(log.renders[1].prompt, /CORRECTIONS[\s\S]*reads "opne"/);
   assert.match(log.renders[2].prompt, /CORRECTIONS[\s\S]*three panels drawn/);
-  assert.doesNotMatch(log.renders[2].prompt, /opne/, 'each round carries only the last round\'s defects');
+  assert.match(log.renders[2].prompt, /opne/, 'round 3 is still told about round 1\'s defect, or the render can regress on it untold');
+  assert.equal(log.renders[2].prompt.match(/opne/g).length, 1, 'one line per assertion, never a duplicate');
   const recipe = JSON.parse(readFileSync(out.recipe, 'utf8'));
   assert.equal(recipe.readback.rounds, 3);
   assert.equal(recipe.readback.history.length, 3);
@@ -232,6 +233,7 @@ test('--tier fast swaps in the flare model at high; --layout and --pack override
   const argv = log.renders[0].argv;
   assert.equal(argv[argv.indexOf('--model') + 1], 'gpt-image-2.5-flare');
   assert.equal(argv[argv.indexOf('--quality') + 1], 'high');
+  assert.equal(argv[argv.indexOf('--size') + 1], '1536x1024', 'the fast tier never renders at the premium size');
   const grid = ['--title', 'FOUR', '--beats', 'a|b|c|d', '--labels', '1|2|3|4'];
   const r2 = await capture(() => main(['g', ...grid, '--layout', 'grid', '--dry-run'], root, { env: { ...process.env, ...env } }));
   assert.equal(r2.code, 0);
@@ -274,10 +276,11 @@ test('--publish <png> publishes a render a person has already looked at: no adap
   assert.equal(log.renders.length, 0);
   assert.equal(log.readbacks.length, 0);
   assert.equal(out.png, png);
-  assert.equal(out.rounds, 0);
+  assert.equal(out.rounds, 3, 'the round the published png came from');
+  assert.deepEqual(out.verdicts, [{ assertion: 'eyes open', verdict: 'DEFECT', note: 'turned away' }], '--json shows what the recipe says');
   assert.ok(existsSync(out.webp));
   const recipe = JSON.parse(readFileSync(out.recipe, 'utf8'));
-  assert.equal(recipe.readback.rounds, 0);
+  assert.equal(recipe.readback.rounds, 3);
   assert.equal(recipe.readback.publishedFrom, png);
   assert.match(recipe.readback.vision, /operator/);
   assert.equal(recipe.readback.overruled, true);
@@ -299,4 +302,17 @@ test('--json on a surviving DEFECT and on success both carry the per-round histo
   const ok = fakes();
   const good = await capture(() => main(['my-page', ...PAGE, '--json'], root, { ...ok.deps, env: { ...process.env, ...env } }));
   assert.equal(JSON.parse(good.stdout).history.length, 1);
+});
+
+test('a usage error from the flags exits 2 with the message, never 1', async () => {
+  const { root, env } = site();
+  const chunks = [];
+  const orig = console.error;
+  console.error = (...m) => chunks.push(m.join(' '));
+  try {
+    assert.equal(await main(['my-page', '--frob'], root, { env: { ...process.env, ...env } }), 2);
+    assert.equal(await main(['my-page', '--tier', 'cheap'], root, { env: { ...process.env, ...env } }), 2);
+  } finally { console.error = orig; }
+  assert.match(chunks.join('\n'), /unknown flag --frob/);
+  assert.match(chunks.join('\n'), /--tier must be best or fast/);
 });

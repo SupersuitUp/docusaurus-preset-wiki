@@ -31,6 +31,7 @@
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "src/cli/**/*.mjs",
+    "src/hero/**/*.mjs",
     "src/cli/python",
     "lib",
     "test"

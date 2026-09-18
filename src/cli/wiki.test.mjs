@@ -24,7 +24,7 @@ function site() {
 test('--help lists the subcommands and exits 0', () => {
   const r = run(process.cwd(), '--help');
   assert.equal(r.status, 0);
-  for (const s of ['check', 'share', 'icons', 'optimize-images', 'owned-files']) assert.match(r.stdout, new RegExp(s));
+  for (const s of ['check', 'share', 'hero', 'icons', 'optimize-images', 'owned-files']) assert.match(r.stdout, new RegExp(s));
 });
 
 test('an unknown subcommand exits 2', () => {

@@ -59,7 +59,7 @@ and an instance's own `src/theme/` still shadows both.
 | theme | `DocItem/Content` (meta row: dates + share button under the H1), `MDXComponents/A` (external links open in a new tab), `ShareButton`, `PageDates`, `Changelog`, `ChangelogWidget`, and `wiki.css` (layout, typography, components; reads the instance's tokens) |
 | `defineWikiConfig(wiki, overrides?)` | the whole Docusaurus `Config` from `wiki.config.json`: head tags for icons and manifest, robots meta and sitemap from `noindex`, classic preset options including the index-stripping sidebar generator, `themeConfig` metadata, navbar, footer, prism, colour mode |
 | `./middleware` | `createMiddleware({ gate?, secret? })`, `UNFURL_BOT_PATTERN`, `BLOCKED_BOT_PATTERN`, `MATCHER`, `config`, `handleShare`; edge-safe, no Node built-ins |
-| `wiki` CLI | `wiki check` (owned-files, middleware, admonitions, llms, links, image-weight, provenance), `wiki migrate` (a v1.x copy onto the package), `wiki upgrade` (to the newest release, with the CHANGELOG between), `wiki gate set\|status\|link` (the deployed gate, through the Vercel API with read-back, redeploy and live checks), `wiki share`, `wiki icons`, `wiki optimize-images` |
+| `wiki` CLI | `wiki check` (owned-files, middleware, admonitions, llms, links, image-weight, provenance), `wiki migrate` (a v1.x copy onto the package), `wiki upgrade` (to the newest release, with the CHANGELOG between), `wiki gate set\|status\|link` (the deployed gate, through the Vercel API with read-back, redeploy and live checks), `wiki share`, `wiki hero` (render a page's hero through the wiki's Style Pack, read it back, publish it), `wiki icons`, `wiki optimize-images` |
 
 ## Per-wiki additions
 
@@ -128,6 +128,42 @@ export default createMiddleware({ gate });
 Unfurl bots (iMessage, Slack, X, ...) pass the block and the gate but still meet the share layer,
 so a shared link previews. The share secret is `WIKI_SHARE_SECRET`, then `WIKI_GATE_SECRET`;
 rotating it revokes every share link at once.
+
+## A page's hero
+
+`wiki hero` makes an article hero the way every wiki in the family makes one: a strip of beats
+painted in the wiki's Style Pack, lettered with a title and one label per panel, read back before
+it ships. The wiki declares the pack and the defaults once, in `wiki.config.json`:
+
+```json
+"hero": {
+  "stylePack": "warm-editorial-titled",
+  "layout": "grid",
+  "props": { "smart-glasses": ["illustrations/props/smart-glasses.png"] },
+  "gate": ["the smart glasses match the prop photos"]
+}
+```
+
+`stylePack` is a path, or an id looked up in `$WIKI_STYLE_PACKS` and then `../wiki-style-packs/packs`
+beside the wiki. A wiki still carrying the older `hero_register` block is migrated in memory. The
+page supplies the rest:
+
+```bash
+wiki hero capture --title "CAPTURE WITHOUT THE WALL" --labels "the phone|the glasses|the second angle|still there" \
+  --beats "A father holds a phone up between himself and a toddler.|...|...|..." --prop smart-glasses --dry-run
+```
+
+`--dry-run` prints the compiled prompt, the ordered references, the declared strings and the
+read-back gate as JSON and spends nothing. Without it the render goes through the Agentic Brand
+Universe on-brand-image adapter (`$ABU_ADAPTER`, else the newest installed `abu` plugin), falling
+back to the wiki's own `illustrations/scripts/generate.py`; the PNG is read back against every gate
+line and the spelling of every declared string by a vision model (`OPENAI_API_KEY`,
+`WIKI_HERO_VISION_MODEL`); a DEFECT re-rolls with the defect named as a correction, up to three
+rounds; the winner is converted to a WebP at most 1536 wide by the same optimizer the weight gate
+trusts and published beside its recipe, which now carries `readback`. `--write` puts the two
+lines into the page; `--json` prints `{ png, webp, recipe, verdicts, rounds }`. A DEFECT that
+survives every round publishes nothing and exits 3, leaving the rounds and their verdicts on disk;
+a person who looks and disagrees publishes that round with `--publish <png>`, and the recipe says so.
 
 ## Overriding one component
 

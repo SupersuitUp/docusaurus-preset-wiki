@@ -7,6 +7,7 @@ carried in below under "Before the package" so the history reads in one place.
 
 ## Unreleased
 
+- `wiki check retired-words`: refuses a live page that uses a word the operator retired. Config is `retired_words` in wiki.config.json (`words[{name, pattern, since, use}]`, `exempt[]` globs); a wiki not yet on the package reads `scripts/retired-words.json` with the same shape. First entries: worklife (2026-09-19, the thing is life infrastructure). Jarvis stays per-wiki because the meta pages that say it was retired must be allowed to say so.
 - `wiki hero` refuses a panel caption of fewer than four words or more than twelve, naming the offender. A caption is a short plain sentence, never a one- or two-word tag: a hero shipped with bands reading "the phone" and "the glasses" on 2026-09-18 and the rule was named from a phone ("short sentences in very plain language not just 1-2 words"). The band carries about twelve words.
 
 ## 1.6.0 (2026-09-18)

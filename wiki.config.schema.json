@@ -24,6 +24,16 @@
     "copyright": { "type": "string", "description": "Footer copyright text" },
     "noindex": { "type": "boolean", "description": "If true, robots noindex meta + disable sitemap" },
     "description": { "type": "string", "description": "Site description used in llms.txt header" },
+    "retired_words": {
+      "type": "object",
+      "description": "Words the operator has retired on purpose. The build refuses any live page that uses one. Match is on the bare word, case-insensitive; `use` is printed with every hit.",
+      "properties": {
+        "words": { "type": "array", "items": { "type": "object", "required": ["name", "pattern", "since", "use"],
+          "properties": { "name": {"type": "string"}, "pattern": {"type": "string"}, "since": {"type": "string"}, "use": {"type": "string"} } } },
+        "exempt": { "type": "array", "items": {"type": "string"} }
+      },
+      "required": ["words"]
+    },
     "gate": {
       "type": "object",
       "additionalProperties": false,

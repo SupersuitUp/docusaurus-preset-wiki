@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import {mkdtempSync, mkdirSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {findRetiredWords, scanTree, resolveConfig} from './check-retired-words.mjs';
+import {findRetiredWords, scanTree, resolveConfig, globToRe} from './check-retired-words.mjs';
 
 const WORDS = [{name: 'worklife', pattern: '\\bwork[- ]?life\\b|\\bwork/life\\b|\\bworklives\\b', since: '2026-09-19', use: 'life infrastructure'}];
 
@@ -33,6 +33,13 @@ test('scans docs, plain and src/data, skips exempt globs, reports file and line'
   assert.equal(hits[0].file, 'docs/a.md');
   assert.equal(hits[0].line, 5);
   assert.equal(hits[0].name, 'worklife');
+});
+
+test('** in a glob matches zero or more path segments, not one or more', () => {
+  const re = globToRe('static/**/*.recipe.json');
+  assert.ok(re.test('static/a.recipe.json'), 'zero directories between static/ and the file');
+  assert.ok(re.test('static/img/comics/x.recipe.json'), 'two directories between static/ and the file');
+  assert.equal(re.test('docs/a.recipe.json'), false, 'a different top-level dir is still scanned');
 });
 
 test('config comes from wiki.config.json first, then scripts/retired-words.json, else nothing', () => {

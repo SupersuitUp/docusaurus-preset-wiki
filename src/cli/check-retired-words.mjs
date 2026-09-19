@@ -29,9 +29,35 @@ export function findRetiredWords(text, words) {
   return out;
 }
 
-function globToRe(glob) {
-  const src = glob.split('**').map((part) => part.split('*').map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*')).join('.*');
-  return new RegExp('^' + src + '$');
+const GLOB_SPECIAL = /[.+?^${}()|[\]\\]/;
+
+// A `**` segment matches ZERO or more full path segments, not one or more: `static/**/*.recipe.json`
+// must exempt `static/a.recipe.json` (zero directories between `static/` and the file) as well as
+// `static/img/comics/x.recipe.json` (two). A naive `split('**').join('.*')` forces the literal `/`
+// that follows `**` in the source glob to still appear in the match, which makes the zero-segment
+// case impossible. Fixed by walking the glob and folding `**` plus an adjacent `/` into a single
+// optional `(?:.*/)?` group, so the group can match nothing at all.
+export function globToRe(glob) {
+  let out = '';
+  let i = 0;
+  while (i < glob.length) {
+    if (glob[i] === '*' && glob[i + 1] === '*') {
+      if (glob[i + 2] === '/') {
+        out += '(?:.*/)?'; // '**/' (mid-pattern or leading): zero or more segments, each ending in /
+        i += 3;
+      } else {
+        out += '.*'; // '/**' trailing, or a bare '**' with no adjacent slash
+        i += 2;
+      }
+    } else if (glob[i] === '*') {
+      out += '[^/]*';
+      i += 1;
+    } else {
+      out += GLOB_SPECIAL.test(glob[i]) ? '\\' + glob[i] : glob[i];
+      i += 1;
+    }
+  }
+  return new RegExp('^' + out + '$');
 }
 
 function walk(dir, acc = []) {

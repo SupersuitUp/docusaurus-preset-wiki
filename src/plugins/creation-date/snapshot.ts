@@ -69,14 +69,26 @@ export function writeSnapshot(siteDir: string, history: History): boolean {
 
 /** Snapshot plus live git: events by id (live wins), page dates by the earliest birth and latest touch. */
 export function mergeHistory(snapshot: History, live: History): History {
+  // A snapshot event outlives the page it describes, and it still carries the routePath that
+  // page had on the day it was written. On a shallow clone nothing regenerates those rows, so
+  // the changelog goes on linking to a page that has since been deleted and the PRODUCTION
+  // build fails on a broken link while the local one passes (getfreedom-wiki, 2026-09-05, nine
+  // skill pages deleted at once; any single deletion does it). Clear the route rather than
+  // drop the event: "this page was created on the 3rd" stays true after the page is gone, and
+  // the widget renders an event with no routePath as plain text. Lifted from getfreedom-wiki's
+  // own copy of this plugin on 2026-09-20, where it had lived alone since the day it was found.
+  const liveRoutes = live.liveRoutePaths ? new Set(live.liveRoutePaths) : null;
+  const onLiveRoute = (event: ChangeEvent): ChangeEvent =>
+    !liveRoutes || !event.routePath || liveRoutes.has(event.routePath) ? event : { ...event, routePath: '' };
   const byId = new Map<string, ChangeEvent>();
-  for (const event of snapshot.changeEvents) byId.set(event.id, event);
-  for (const event of live.changeEvents) byId.set(event.id, event);
+  for (const event of snapshot.changeEvents) byId.set(event.id, onLiveRoute(event));
+  for (const event of live.changeEvents) byId.set(event.id, onLiveRoute(event));
   return {
     changeEvents: sortNewestFirst([...byId.values()]),
     pageDates: mergePageDates(snapshot.pageDates, live.pageDates),
     // The working tree is the only source of what is built; a snapshot's idea of it is stale.
     liveDocKeys: live.liveDocKeys,
+    liveRoutePaths: live.liveRoutePaths,
   };
 }
 

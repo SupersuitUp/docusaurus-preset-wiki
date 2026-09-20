@@ -46,6 +46,28 @@ test('mergeHistory: live events win by id, page dates merge by earliest birth an
   assert.deepEqual(merged.pageDates.a, { created: '2026-09-01T00:00:00Z', updated: '2026-09-04T00:00:00Z' });
 });
 
+test('a snapshot row for a page that no longer exists keeps its event and loses its link', () => {
+  // The route in the snapshot was true the day it was written; the page has since been deleted
+  // and a shallow clone cannot regenerate the row. Linking it breaks the production build.
+  const merged = mergeHistory(
+    {
+      changeEvents: [
+        { id: 'gone@1', type: 'new', date: '2026-09-01T00:00:00Z', docKey: 'skills/gone', routePath: '/skills/gone', section: 'skills', title: 'Gone' },
+        { id: 'here@1', type: 'new', date: '2026-09-01T00:00:00Z', docKey: 'skills/here', routePath: '/skills/here', section: 'skills', title: 'Here' },
+      ],
+      pageDates: {},
+    },
+    { changeEvents: [], pageDates: {}, liveDocKeys: ['skills/here'], liveRoutePaths: ['/skills/here'] },
+  );
+  const byKey = Object.fromEntries(merged.changeEvents.map((e) => [e.docKey, e]));
+  assert.equal(byKey['skills/gone'].routePath, '', 'the deleted page is not linked');
+  assert.equal(byKey['skills/gone'].type, 'new', 'but its history is kept');
+  assert.equal(byKey['skills/here'].routePath, '/skills/here');
+  // Without a live-route list (an older caller) nothing is touched.
+  const untouched = mergeHistory({ changeEvents: [byKey['skills/gone'] && { ...byKey['skills/gone'], routePath: '/skills/gone' }], pageDates: {} }, { changeEvents: [], pageDates: {} });
+  assert.equal(untouched.changeEvents[0].routePath, '/skills/gone');
+});
+
 test('undatedPages names the live pages nothing can date', () => {
   const history = { changeEvents: [], pageDates: { a: { created: 'x' }, b: {} } };
   assert.deepEqual(undatedPages(history, ['c', 'a', 'b']), ['b', 'c']);

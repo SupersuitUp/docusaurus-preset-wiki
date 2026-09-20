@@ -44,6 +44,17 @@ dependency to the newest release, prints the CHANGELOG entries between, and buil
 carrying copied framework files (wiki-template v1.x) takes `wiki migrate`**, which is the v2.0.0
 ledger remedy as code and leaves a note for anything only a person can decide.
 
+## Releasing
+
+**Publishing is a tag push. Nothing on any laptop publishes this package, and `npm login` is
+never the answer** (Gary, 2026-09-20: "we publish via github actions bro"). Bump `version` in
+package.json, write the CHANGELOG entry, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
+`.github/workflows/publish.yml` publishes through npm's OIDC trusted publishing: no token, no
+one-time password, no human round trip. Its version guard refuses a tag that disagrees with
+package.json and a version already on npm, so **a tag is not movable**: the first push of `v1.8.0`
+published whatever main was at that moment, and the two commits landed under a force-moved
+`v1.8.0` afterwards reached nobody until `v1.8.1`. A fix after the tag is the next version.
+
 ## What the preset does
 
 Registered by `defineWikiConfig` after `classic`, so its theme components shadow theme-classic's

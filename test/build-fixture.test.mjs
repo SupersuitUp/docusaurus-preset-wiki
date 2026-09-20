@@ -83,6 +83,11 @@ test('a fixture instance builds from the package and emits every framework outpu
   const cssText = css.map((f) => readFileSync(join(out, 'assets', 'css', f), 'utf8')).join('\n');
   assert.match(cssText, /doc-meta-slot|\.markdown h1\s*\+\s*p/, 'framework wiki.css bundled');
   assert.match(cssText, /--ifm-color-primary/, 'instance brand tokens bundled');
+  assert.match(
+    cssText,
+    /:is\(h1,\s*header,\s*\.doc-meta-slot\)\s*\+\s*p/,
+    'the definition-line rule reaches past the meta row (h1 + p alone no longer matches)',
+  );
 
   // A blockquote's inner <p> keeps the `.markdown p` bottom margin, and that margin sits
   // INSIDE the left rule, hanging a phantom blank line off the end of every quote

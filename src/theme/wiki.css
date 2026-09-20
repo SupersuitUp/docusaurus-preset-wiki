@@ -336,6 +336,14 @@ button[aria-label="Copy link to this page"]:hover {
   letter-spacing: -0.01em;
 }
 
+/* The Sign out link is an absolute href (the middleware answers it; no page exists, and
+   the broken-link check refuses the relative form), so Docusaurus decorates it as external.
+   It opens in the same tab; the "opens in new tab" icon would be a lie. */
+.navbar__link[href$="/sign-out"] .iconExternalLink_TXt_,
+.navbar__link[href$="/sign-out"] svg[aria-label="(opens in new tab)"] {
+  display: none;
+}
+
 /* ============================
    Footer
    ============================ */

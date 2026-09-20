@@ -7,10 +7,13 @@
 // the CHANGELOG entries between the two so a major is read before it is merged, runs the build
 // (which runs `wiki check`). Never commits, never pushes: read the diff, commit by explicit
 // paths, push, then check the deployed site.
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { spawnSync, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { ensurePrepare } from "./install-hooks.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 const ROOT = process.cwd();
 const args = process.argv.slice(2);
@@ -53,6 +56,15 @@ export function upgrade() {
     if (between.length) { console.log("\n" + between.join("\n").trim() + "\n"); }
     if (from && to.split(".")[0] !== from.split(".")[0]) log("MAJOR: something an instance must do changed. Read the entries above before committing.");
   }
+  // 1.8.0: the page-dates snapshot refreshes from a pre-commit hook, installed by `prepare`.
+  // An instance upgraded from an earlier release has no such script, so add it and install
+  // the hook now rather than on the next install.
+  if (ensurePrepare(pkg)) {
+    writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+    log("package.json: added `prepare: wiki install-hooks`");
+  }
+  const h = spawnSync(process.execPath, [join(HERE, "install-hooks.mjs")], { cwd: ROOT, stdio: "inherit" });
+  if (h.status !== 0) { console.error("[upgrade] install-hooks failed"); return 1; }
   if (!args.includes("--no-build")) {
     const b = spawnSync(pm, ["run", "build"], { cwd: ROOT, stdio: "inherit" });
     if (b.status !== 0) { console.error("[upgrade] build failed; the CHANGELOG above names what an instance must change"); return 1; }

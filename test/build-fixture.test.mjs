@@ -35,9 +35,15 @@ test('a fixture instance builds from the package and emits every framework outpu
     recursive: true,
     filter: (p) => !/node_modules|[\\/]build$|\.docusaurus|search-index\.json|llms.*\.txt$/.test(p),
   });
-  // The fixture's file: points at ../.. from its committed location; the copy needs the absolute path.
+  // Install the PACKED tarball, not a file: link to the checkout. A link resolves the
+  // package to its real path, so its own node_modules shadow the site's and every
+  // `@docusaurus/*` module the theme imports (useDoc's DocProvider context, for one) is
+  // loaded twice; a registry install has no nested copy and never hits that. The tarball is
+  // what npm publish ships, so this also proves `files` in package.json is complete.
+  sh('npm', ['pack', '--pack-destination', site], PKG);
+  const tarball = join(site, readdirSync(site).find((f) => f.endsWith('.tgz')));
   const pj = JSON.parse(readFileSync(join(site, 'package.json'), 'utf8'));
-  pj.dependencies['@supersuit/docusaurus-preset-wiki'] = `file:${PKG}`;
+  pj.dependencies['@supersuit/docusaurus-preset-wiki'] = `file:${tarball}`;
   writeFileSync(join(site, 'package.json'), JSON.stringify(pj, null, 2));
 
   // The changelog plugin reads git history; one commit is enough to give every page a date.
@@ -91,6 +97,47 @@ test('a fixture instance builds from the package and emits every framework outpu
 
   const changelog = JSON.parse(readFileSync(join(site, 'src', 'data', 'changelog-events.json'), 'utf8'));
   assert.ok(changelog.changeEvents.some((e) => e.docKey === 'concepts/alpha' && e.type === 'new'), 'changelog snapshot written from git');
+  assert.ok(changelog.pageDates['concepts/alpha']?.created, 'page dates written into the snapshot');
+  assert.ok(changelog.pageDates['index']?.created, 'the front page (excluded from the changelog) is dated');
+
+  // Created / Updated is in the STATIC HTML, directly under the H1, on both title paths:
+  // a page that writes its own `# Alpha`, and one titled by frontmatter alone. Until
+  // 2026-09-20 the row was portalled in after hydration, so the scriptless share mirror
+  // never showed it and a page committed after the snapshot showed nothing at all.
+  const metaAfterH1 = /<h1[^>]*>[\s\S]*?<\/h1>\s*<div class=("doc-meta-slot"|doc-meta-slot)[^>]*>[\s\S]*?Created <time datetime=("?\d{4}-\d{2}-\d{2}"?)/;
+  assert.match(page, metaAfterH1, 'alpha (content H1): Created row rendered server-side under the title');
+  const beta = readFileSync(join(out, 'concepts', 'beta', 'index.html'), 'utf8');
+  assert.match(beta, metaAfterH1, 'beta (synthetic title): Created row rendered server-side under the title');
+  assert.equal((beta.match(/doc-meta-slot/g) ?? []).length, 1, 'exactly one meta row on a synthetic-title page');
+  assert.equal((page.match(/doc-meta-slot/g) ?? []).length, 1, 'exactly one meta row on a content-H1 page');
+  const front = readFileSync(join(out, 'index.html'), 'utf8');
+  assert.match(front, /Created <time/, 'the front page, which the changelog excludes, still shows its dates');
+  assert.match(mirror, /Created <time datetime=/, 'the share mirror carries the dates (it has no scripts to add them later)');
+  assert.match(mirror, /\.doc-meta-slot \.doc-share-button \{ display: none/, 'the mirror hides the copy-link button, not the dates');
+
+  // The snapshot keeps itself fresh: `refresh-dates --check` sees the build's snapshot as
+  // current, a commit that touches a doc makes it stale, the pre-commit hook refreshes it
+  // from the history before that commit, and the following commit carries the refresh.
+  const wiki = join(site, 'node_modules', '.bin', 'wiki');
+  const gitc = (...args) => sh('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.com', ...args], site);
+  sh(wiki, ['refresh-dates', '--check'], site);
+  gitc('add', '-A');
+  gitc('commit', '-q', '-m', 'snapshot from the build');
+  const hookLog = sh(wiki, ['install-hooks'], site);
+  assert.match(hookLog, /pre-commit hook written/);
+  writeFileSync(join(site, 'docs', 'concepts', 'alpha.md'), readFileSync(join(site, 'docs', 'concepts', 'alpha.md'), 'utf8') + '\nA later edit.\n');
+  gitc('add', 'docs/concepts/alpha.md');
+  gitc('commit', '-q', '-m', 'edit alpha');
+  const check = spawnSync(wiki, ['refresh-dates', '--check'], { cwd: site, encoding: 'utf8' });
+  assert.equal(check.status, 1, 'the snapshot is one commit behind, as designed, and --check says so');
+  writeFileSync(join(site, 'docs', 'concepts', 'beta.md'), readFileSync(join(site, 'docs', 'concepts', 'beta.md'), 'utf8') + '\nAnother edit.\n');
+  gitc('add', 'docs/concepts/beta.md');
+  gitc('commit', '-q', '-m', 'edit beta');
+  const committed = JSON.parse(sh('git', ['show', 'HEAD:src/data/changelog-events.json'], site));
+  assert.ok(
+    committed.changeEvents.some((e) => e.docKey === 'concepts/alpha' && e.type === 'updated'),
+    'the hook refreshed the snapshot with the previous commit and staged it into this one',
+  );
 
   assert.match(log, /\[share-view\] emitted \d+ chrome-less share pages/, 'share-view plugin ran');
   assert.match(log, /\[manifest-plugin\] wrote manifest\.webmanifest/, 'manifest plugin ran');

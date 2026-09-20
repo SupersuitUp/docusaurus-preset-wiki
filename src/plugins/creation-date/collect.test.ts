@@ -99,6 +99,23 @@ test('drafts and _hidden pages are not dated and not live', () => {
   assert.deepEqual(liveDocKeys, ['concepts/shown']);
 });
 
+test('a page hidden with an underscore and later restored gets its history back; one still hidden stays hidden', () => {
+  const { root, commit } = repo();
+  writeFileSync(join(root, 'docs', 'concepts', '_secret.md'), page('Secret'));
+  writeFileSync(join(root, 'docs', 'concepts', '_still.md'), page('Still hidden'));
+  commit('hidden drafts', 1);
+  renameSync(join(root, 'docs', 'concepts', '_secret.md'), join(root, 'docs', 'concepts', 'secret.md'));
+  commit('unhide secret', 4);
+
+  const { changeEvents, pageDates, liveDocKeys } = collectHistory(root);
+  assert.deepEqual(liveDocKeys, ['concepts/secret']);
+  assert.equal(pageDates['concepts/secret'].created?.slice(0, 10), '2026-09-01', 'its birthday is the hidden commit');
+  assert.equal(pageDates['concepts/secret'].updated?.slice(0, 10), '2026-09-04');
+  assert.ok(changeEvents.some((e) => e.docKey === 'concepts/secret'), 'the restored page is in the changelog');
+  assert.ok(!changeEvents.some((e) => e.title === 'Still hidden'), 'the one still hidden leaks nothing');
+  assert.equal(pageDates['concepts/_still'], undefined);
+});
+
 test('a shallow clone dates only what it can see, and never invents a birthday', () => {
   const { root, commit } = repo();
   writeFileSync(join(root, 'docs', 'concepts', 'old.md'), page('Old'));

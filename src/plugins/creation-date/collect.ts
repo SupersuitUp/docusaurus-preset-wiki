@@ -241,6 +241,7 @@ export function collectHistory(siteDir: string): History {
   // the file. Any path that ever carried a "_" segment is hidden forever, under
   // its underscored key, its bare key, and its leaf (for folder moves).
   const hiddenDocKeys = new Set<string>();
+  const hiddenLeafKeys = new Set<string>();
   const bareKey = (docKey: string) =>
     docKey
       .split('/')
@@ -254,9 +255,28 @@ export function collectHistory(siteDir: string): History {
       if (!docKey) continue;
       hiddenDocKeys.add(bareKey(docKey));
       const leaf = draftLeaf(docKey);
-      if (leaf && leaf !== 'index') draftLeafKeys.add(leaf);
+      if (leaf && leaf !== 'index') hiddenLeafKeys.add(leaf);
     }
   }
+
+  // Unhiding is the mirror of the rule above. A hidden page that is later
+  // RESTORED (underscore dropped, `draft` removed) is live again, and its
+  // history has to come back with it, otherwise a path that once carried a "_"
+  // would stay invisible for the life of the repo. So the path rule yields to
+  // the working tree in exactly one direction: a docKey present in
+  // `currentMeta` is live and is never suppressed by history. A page that was
+  // hidden and then deleted has no `currentMeta` entry, so it stays suppressed,
+  // which is the case the path rule exists for. (appliedai-wiki, 2026-08-12,
+  // unhiding nine drafts; lifted into the package 2026-09-20.)
+  // A file that STILL carries the underscore is in the tree and is not live, so
+  // it must not unhide itself.
+  for (const docKey of currentMeta.keys()) {
+    if (docKey.split('/').some((s) => s.startsWith('_'))) continue;
+    hiddenDocKeys.delete(bareKey(docKey));
+    const leaf = draftLeaf(docKey);
+    if (leaf) hiddenLeafKeys.delete(leaf);
+  }
+  for (const leaf of hiddenLeafKeys) draftLeafKeys.add(leaf);
 
   // Recover frontmatter for a path that no longer exists in the tree from
   // a specific commit (the deletion's parent, or the add/edit commit).

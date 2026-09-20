@@ -85,6 +85,10 @@ function help() {
   share [...]          the unlock-link CLI: OPEN / UNLOCKED / BLOCKED / MINTABLE, focused shares
   migrate              move a wiki still carrying copied framework files (wiki-template v1.x) onto the package
   upgrade [--to v]     bring a wiki on the package to the newest release, printing the CHANGELOG between
+  refresh-dates        rewrite src/data/changelog-events.json from full git history and stage it; the
+                       Created / Updated line on every page and /changelog read it in production
+                       (--check: exit 1 when it is behind; --no-stage)
+  install-hooks        write the pre-commit hook that runs refresh-dates; idempotent, run by \`prepare\`
   gate set|status|link the password gate of the deployed wiki: set or rotate it through the Vercel API,
                        verify by read-back, redeploy, check the live site (wiki gate --help)
   hero <slug> [...]    render a page's hero through the wiki's Style Pack, read it back against the gate,
@@ -134,6 +138,12 @@ switch (cmd) {
     break;
   case 'upgrade':
     status = node('upgrade.mjs', ...rest);
+    break;
+  case 'refresh-dates':
+    status = node('refresh-dates.mjs', ...rest);
+    break;
+  case 'install-hooks':
+    status = node('install-hooks.mjs', ...rest);
     break;
   case 'icons':
     status = python('build-icons.py', ...rest);

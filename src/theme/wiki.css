@@ -105,14 +105,18 @@
    Italic definition line under H1
    ============================ */
 
-.markdown h1 + p > em:only-child,
-.markdown h1 + p em:first-child:last-child {
+/* The definition line is the first paragraph after the title, and since 1.8.0 the title
+   is followed by the meta row (Created / Updated, share): after the H1 itself on a page
+   that writes `# Title`, inside <header> beside a synthetic title. `h1 + p` alone matched
+   neither once the row was there (and never matched the synthetic case at all). */
+.markdown :is(h1, header, .doc-meta-slot) + p > em:only-child,
+.markdown :is(h1, header, .doc-meta-slot) + p em:first-child:last-child {
   font-size: 1.1rem;
   color: #555;
   line-height: 1.5;
 }
 
-.markdown h1 + p:has(> em:only-child) {
+.markdown :is(h1, header, .doc-meta-slot) + p:has(> em:only-child) {
   font-size: 1.1rem;
   color: #555;
   margin-top: 0.25rem;

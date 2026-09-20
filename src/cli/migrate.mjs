@@ -32,6 +32,7 @@ import { existsSync, readFileSync, writeFileSync, rmSync, readdirSync, statSync,
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { ensurePrepare } from "./install-hooks.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.cwd();
@@ -267,6 +268,7 @@ export function migrate() {
   for (const k of Object.keys(s)) if (/^(check|test|template|share|optimize|accept|icons)/.test(k)) delete s[k];
   Object.assign(s, { prebuild: "wiki check", check: "wiki check", share: "wiki share", icons: "wiki icons", "optimize:images": "wiki optimize-images" });
   pkg.scripts = s;
+  ensurePrepare(pkg);
   write("package.json", JSON.stringify(pkg, null, 2) + "\n");
   const wc = JSON.parse(read("wiki.config.json"));
   wc.$schema = `./node_modules/${PKG}/wiki.config.schema.json`;

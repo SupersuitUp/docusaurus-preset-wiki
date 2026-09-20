@@ -54,7 +54,7 @@ export default function ShareButton(): React.JSX.Element {
     : 'copy link';
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+    <span className="doc-share-button" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
       <button
         onClick={handleClick}
         style={{

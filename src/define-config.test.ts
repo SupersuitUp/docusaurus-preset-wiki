@@ -13,8 +13,11 @@ const wiki = {
 test('a declared gate puts Sign out in the navbar; an open wiki shows nothing', () => {
   const items = (c: any) => c.themeConfig.navbar.items;
   assert.deepEqual(items(defineWikiConfig(wiki)), []);
-  assert.deepEqual(items(defineWikiConfig({ ...wiki, gate: { type: 'freedom-account' } })), [{ href: '/sign-out', label: 'Sign out', position: 'right' }]);
-  assert.deepEqual(items(defineWikiConfig({ ...wiki, gate: { unlockParam: 'k' } })), [{ href: '/sign-out', label: 'Sign out', position: 'right' }]);
+  // ABSOLUTE, so Docusaurus's broken-link check leaves it alone: /sign-out has no page, the
+  // middleware answers it, and a relative href failed both wikis' deploys on 2026-09-20.
+  const item = { href: 'https://t.wiki/sign-out', label: 'Sign out', position: 'right', target: '_self' };
+  assert.deepEqual(items(defineWikiConfig({ ...wiki, gate: { type: 'freedom-account' } })), [item]);
+  assert.deepEqual(items(defineWikiConfig({ ...wiki, gate: { unlockParam: 'k' } })), [item]);
   assert.deepEqual(items(defineWikiConfig({ ...wiki, gate: { type: 'none' } })), []);
   assert.equal(gateDeclared(wiki, { WIKI_PASSWORD: 'word' }), true, 'a live password at build time');
   assert.equal(gateDeclared(wiki, { WIKI_PASSWORD: '  ' }), false, 'the empty string one CLI stored is no password');

@@ -39,6 +39,11 @@ export function gateDeclared(wiki: WikiConfig, env: Record<string, string | unde
   return Boolean((env.WIKI_PASSWORD ?? '').trim());
 }
 
+/** The navbar's Sign out link. Absolute on purpose; see the navbar block below. */
+export function signOutItem(wiki: WikiConfig) {
+  return { href: `${wiki.url.replace(/\/$/, '')}/sign-out`, label: 'Sign out', position: 'right' as const, target: '_self' };
+}
+
 export function defineWikiConfig(wiki: WikiConfig, overrides: Overrides = {}): Config {
   const { themeConfig: themeOverrides, siteDir, ...configOverrides } = overrides;
   // Docusaurus reads the config from the site root, so that is where `static/` is.
@@ -169,8 +174,11 @@ export function defineWikiConfig(wiki: WikiConfig, overrides: Overrides = {}): C
         // DECLARED (wiki.config.json `gate.type` password or freedom-account, or an unlockParam)
         // or when the build itself carries a live password, which is the same environment the
         // edge reads; an open wiki shows nothing, because a Sign out on a site nobody signed in
-        // to is a lie about the site. /sign-out is answered by the middleware.
-        items: gateDeclared(wiki) ? [{ href: '/sign-out', label: 'Sign out', position: 'right' }] : [],
+        // to is a lie about the site. /sign-out is answered by the middleware, so no page exists
+        // for it and Docusaurus's broken-link check would refuse the build: the href is the
+        // site's ABSOLUTE url, which the checker leaves alone, with target _self so it stays in
+        // the tab like any other navbar link.
+        items: gateDeclared(wiki) ? [signOutItem(wiki)] : [],
       },
       footer: {
         style: 'light',

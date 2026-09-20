@@ -131,3 +131,5 @@ export default createMiddleware();
 
 export { createPasswordGate, hasValidTicket } from './gate/passwordGate';
 export type { PasswordGateOptions } from './gate/passwordGate';
+export { createFreedomAccountGate, hasValidGrant, hourKey, mintPass, grantCookieValue, DEFAULT_OPEN_PATHS } from './gate/accountGate';
+export type { AccountGateOptions } from './gate/accountGate';

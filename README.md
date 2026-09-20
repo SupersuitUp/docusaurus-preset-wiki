@@ -105,6 +105,8 @@ wiki gate link /some/page --password "the word"
 wiki gate set --rotate-secrets           # every ticket and share link ever issued stops working
 ```
 
+For a wiki that is for Freedom operators only, `createMiddleware({ gate: createFreedomAccountGate({ signInUrl }) })` replaces the password with the portal's Google sign-in: a stranger's one button goes to `<signInUrl>?to=<url>`, an active Freedom account comes back with a five-minute `?pass=` the gate swaps for a seven-day grant, and the portal's hourly `?k=` link still skips the door. `WIKI_PASS_SECRET` (or `WIKI_GATE_SECRET`) must match the portal's. See `src/gate/accountGate.ts`.
+
 A preloaded link is `<any page>?key=<password>`: it sets a thirty-day ticket cookie and lands the
 reader on the page, with the key stripped from the address. Any capitalization of the password
 works. `llms.txt`, `skills/`, `generators/` and media stay open for agents that cannot answer a

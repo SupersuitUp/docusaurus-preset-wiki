@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defineWikiConfig } from './define-config';
+import { defineWikiConfig, gateDeclared } from './define-config';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -9,6 +9,16 @@ const wiki = {
   title: 'T', tagline: 'tag', url: 'https://t.wiki', organizationName: 'o', projectName: 'p',
   copyright: '© T', noindex: true, description: 'd', og: { bg: '#123456' },
 };
+
+test('a declared gate puts Sign out in the navbar; an open wiki shows nothing', () => {
+  const items = (c: any) => c.themeConfig.navbar.items;
+  assert.deepEqual(items(defineWikiConfig(wiki)), []);
+  assert.deepEqual(items(defineWikiConfig({ ...wiki, gate: { type: 'freedom-account' } })), [{ href: '/sign-out', label: 'Sign out', position: 'right' }]);
+  assert.deepEqual(items(defineWikiConfig({ ...wiki, gate: { unlockParam: 'k' } })), [{ href: '/sign-out', label: 'Sign out', position: 'right' }]);
+  assert.deepEqual(items(defineWikiConfig({ ...wiki, gate: { type: 'none' } })), []);
+  assert.equal(gateDeclared(wiki, { WIKI_PASSWORD: 'word' }), true, 'a live password at build time');
+  assert.equal(gateDeclared(wiki, { WIKI_PASSWORD: '  ' }), false, 'the empty string one CLI stored is no password');
+});
 
 test('builds title, url and the preset entry', () => {
   const c = defineWikiConfig(wiki);

@@ -38,6 +38,7 @@
 // EDGE-SAFE: Web Crypto only, no Node built-ins.
 
 import type { GateFn, GateVerdict } from './types';
+import { justSignedOut } from './signOut';
 
 export interface AccountGateOptions {
   /** The portal page that signs a reader in and bounces them back: `<signInUrl>?to=<url>`. */
@@ -131,9 +132,19 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// One neutral door that names the wiki by its host. The button carries the page the reader
-// asked for, so signing in lands them on it rather than on the wiki's front page.
-export function doorPage(title: string, signInHref: string, expired: boolean): string {
+// One neutral door that names the wiki by its host. It says nothing about WHAT the program is
+// (Gary, 2026-09-20: "should not mention the word Freedom ... more ambiguous"): a stranger learns
+// only that the site is gated and that an invited Google account opens it. The button carries the
+// page the reader asked for, so signing in lands them on it rather than on the front page.
+export interface DoorState {
+  /** The pass on the link was expired or wrong. */
+  expired?: boolean;
+  /** The reader just signed out of this wiki. */
+  signedOut?: boolean;
+}
+
+export function doorPage(title: string, signInHref: string, state: DoorState | boolean = {}): string {
+  const { expired = false, signedOut = false } = typeof state === 'boolean' ? { expired: state } : state;
   const t = escapeHtml(title);
   return `<!doctype html>
 <html lang="en">
@@ -149,25 +160,24 @@ export function doorPage(title: string, signInHref: string, expired: boolean): s
   body { background: var(--paper); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.65; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
   main { width: 100%; max-width: 32rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 2.25rem 2rem; }
   .eyebrow { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin: 0 0 0.9rem; font-weight: 600; }
-  h1 { font-size: clamp(1.5rem, 5vw, 1.9rem); line-height: 1.2; margin: 0 0 1rem; }
+  h1 { font-size: clamp(1.4rem, 5vw, 1.75rem); line-height: 1.25; margin: 0 0 1rem; }
   p { margin: 0 0 1.1rem; color: #3c3a34; }
-  code { background: #00000012; padding: 2px 6px; border-radius: 5px; font-size: 0.92em; }
   a.button { display: inline-block; font-size: 1rem; font-weight: 600; color: #fff; background: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 0.7rem 1.4rem; text-decoration: none; }
   a.button:hover { filter: brightness(1.08); }
   a.button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .error { color: #a3543c; font-size: 0.95rem; margin: 0 0 1rem; }
+  .note { color: var(--accent); font-size: 0.95rem; margin: 0 0 1rem; }
   .actions { margin-top: 1.25rem; }
-  .small { font-size: 0.9rem; color: var(--muted); margin-top: 1.4rem; margin-bottom: 0; }
 </style>
 </head>
 <body>
 <main>
   <p class="eyebrow">${t}</p>
-  <h1>This wiki is for people running Freedom.</h1>
-  <p>Sign in with the Google account your Freedom account uses and you will land back on this page.</p>
+  <h1>This website is gated to those who are part of an early access program.</h1>
+  <p>Sign in with the Google account you were invited with and you will land back on this page.</p>
+  ${signedOut ? '<p class="note">You are signed out of this site. Signing in again is one tap unless you also signed out of the account itself.</p>' : ''}
   ${expired ? '<p class="error">That sign-in link expired. Sign in again and it will bring you straight here.</p>' : ''}
-  <div class="actions"><a class="button" href="${escapeHtml(signInHref)}">Sign in with your Freedom account</a></div>
-  <p class="small">Already running Freedom on your own machine? Links from <code>/freedom:profile</code> and the portal carry the key, so open the page from there and there is no door.</p>
+  <div class="actions"><a class="button" href="${escapeHtml(signInHref)}">Sign in</a></div>
 </main>
 </body>
 </html>`;
@@ -239,7 +249,11 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
     // The door, carrying the page they asked for with any spent credential stripped off.
     const back = cleanUrl(PASS_PARAM);
     back.searchParams.delete(KEY_PARAM);
+    back.searchParams.delete('signed-out');
     const signInHref = `${signInUrl}?to=${encodeURIComponent(back.toString())}`;
-    return { authorized: false, response: htmlResponse(doorPage(opts.title ?? url.host, signInHref, passExpired), 401) };
+    return {
+      authorized: false,
+      response: htmlResponse(doorPage(opts.title ?? url.host, signInHref, { expired: passExpired, signedOut: justSignedOut(url) }), 401),
+    };
   };
 }

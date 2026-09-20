@@ -32,6 +32,13 @@ function deepMerge<T extends Record<string, unknown>>(base: T, over: Record<stri
  * own) go in `overrides`: `themeConfig` deep-merges onto the defaults, every other
  * key replaces its default.
  */
+/** Is this wiki's gate on, as far as a build can tell? */
+export function gateDeclared(wiki: WikiConfig, env: Record<string, string | undefined> = process.env): boolean {
+  const g = wiki.gate;
+  if (g && g.type !== 'none' && (g.type || g.unlockParam)) return true;
+  return Boolean((env.WIKI_PASSWORD ?? '').trim());
+}
+
 export function defineWikiConfig(wiki: WikiConfig, overrides: Overrides = {}): Config {
   const { themeConfig: themeOverrides, siteDir, ...configOverrides } = overrides;
   // Docusaurus reads the config from the site root, so that is where `static/` is.
@@ -158,7 +165,12 @@ export function defineWikiConfig(wiki: WikiConfig, overrides: Overrides = {}): C
       navbar: {
         title: wiki.title,
         logo: undefined,
-        items: [],
+        // A wiki that signs readers in gives them a way out. The link shows when the gate is
+        // DECLARED (wiki.config.json `gate.type` password or freedom-account, or an unlockParam)
+        // or when the build itself carries a live password, which is the same environment the
+        // edge reads; an open wiki shows nothing, because a Sign out on a site nobody signed in
+        // to is a lie about the site. /sign-out is answered by the middleware.
+        items: gateDeclared(wiki) ? [{ href: '/sign-out', label: 'Sign out', position: 'right' }] : [],
       },
       footer: {
         style: 'light',

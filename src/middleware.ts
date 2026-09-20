@@ -20,6 +20,7 @@
 
 import { handleShare, type ShareRequest } from './share/handleShare';
 import matcherJson from './cli/matcher.json';
+import { handleSignOut } from './gate/signOut';
 import { gateFromConfig as gateFromConfigFn, type WikiGateConfig as WikiGateConfigShape } from './gate/fromConfig';
 
 export { handleShare };
@@ -70,6 +71,15 @@ export function createMiddleware(opts: MiddlewareOptions = {}) {
         'Forbidden: automated training and AI-search crawlers are not permitted on this site.',
         { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } },
       );
+    }
+
+    // SIGN OUT comes right after the block and before any verdict: it needs no credential, it
+    // is only meaningful on a gated wiki (an open one has nothing to forget, so the address is
+    // left to the static site), and a reader holding a grant must be able to reach it without
+    // the share layer or the gate having an opinion.
+    if (opts.gate) {
+      const out = handleSignOut(request);
+      if (out) return out;
     }
 
     // The gate's verdict is computed before the share layer runs because the share
@@ -127,6 +137,7 @@ export default createMiddleware();
 export { createPasswordGate, hasValidTicket } from './gate/passwordGate';
 export type { PasswordGateOptions } from './gate/passwordGate';
 export { createFreedomAccountGate, hasValidGrant, hourKey, mintPass, grantCookieValue, DEFAULT_OPEN_PATHS } from './gate/accountGate';
+export { handleSignOut, isSignOut, justSignedOut, SIGN_OUT_PATH, GATE_COOKIES } from './gate/signOut';
 export type { AccountGateOptions } from './gate/accountGate';
 export { gateFromConfig, unlockParamFor } from './gate/fromConfig';
 export type { WikiGateConfig, WikiGateType } from './gate/fromConfig';

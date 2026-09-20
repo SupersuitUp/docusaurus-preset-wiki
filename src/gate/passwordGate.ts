@@ -23,6 +23,7 @@
 // EDGE-SAFE: Web Crypto only, no Node built-ins.
 
 import type { GateFn, GateVerdict } from './types';
+import { justSignedOut } from './signOut';
 
 export interface PasswordGateOptions {
   /** Defaults to process.env.WIKI_PASSWORD, read per request. */
@@ -139,7 +140,7 @@ function escapeHtml(value: string): string {
 }
 
 // One neutral door that names the wiki by its host, so nothing per-wiki is needed.
-export function gatePage(title: string, wrongAnswer: boolean): string {
+export function gatePage(title: string, wrongAnswer: boolean, signedOut = false): string {
   const t = escapeHtml(title);
   return `<!doctype html>
 <html lang="en">
@@ -162,6 +163,7 @@ export function gatePage(title: string, wrongAnswer: boolean): string {
   button { display: inline-block; font-size: 1rem; font-weight: 600; color: #fff; background: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 0.7rem 1.4rem; cursor: pointer; font-family: inherit; }
   button:hover { filter: brightness(1.08); }
   .error { color: #a3543c; font-size: 0.95rem; margin: 0 0 1rem; }
+  .note { color: var(--accent); font-size: 0.95rem; margin: 0 0 1rem; }
   .actions { margin-top: 1.25rem; }
 </style>
 </head>
@@ -170,6 +172,7 @@ export function gatePage(title: string, wrongAnswer: boolean): string {
   <p class="eyebrow">${t}</p>
   <h1>This wiki opens with a password.</h1>
   <p>If someone sent you here, they can tell you the word.</p>
+  ${signedOut ? '<p class="note">You are signed out of this site.</p>' : ''}
   ${wrongAnswer ? '<p class="error">Not it. Ask whoever sent you the link.</p>' : ''}
   <form method="POST">
     <input type="password" name="password" placeholder="the password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Password" autofocus />
@@ -268,6 +271,6 @@ export function createPasswordGate(opts: PasswordGateOptions = {}): GateFn | und
       };
     }
 
-    return { authorized: false, response: htmlResponse(gatePage(opts.title ?? url.host, false), 401) };
+    return { authorized: false, response: htmlResponse(gatePage(opts.title ?? url.host, false, justSignedOut(url)), 401) };
   };
 }

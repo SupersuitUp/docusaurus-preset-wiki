@@ -30,7 +30,7 @@ test('a stranger meets the door: 401, noindex, a sign-in link that carries the p
   assert.match(res!.headers.get('content-type') ?? '', /text\/html/);
   assert.equal(res!.headers.get('x-robots-tag'), 'noindex');
   const html = await res!.text();
-  assert.match(html, /people running Freedom/);
+  assert.match(html, /early access program/);
   assert.match(html, new RegExp(`${SIGN_IN.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}\\?to=https%3A%2F%2Ft\\.wiki%2Fconcepts%2Fthe-supersuit%3Fx%3D1`));
 });
 

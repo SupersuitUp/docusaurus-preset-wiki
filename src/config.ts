@@ -12,7 +12,15 @@ export interface WikiConfig {
   copyright: string;
   noindex: boolean;
   description: string;
-  gate?: { unlockParam?: string | null };
+  gate?: {
+    type?: 'password' | 'freedom-account' | 'none';
+    unlockParam?: string | null;
+    machinePaths?: 'open' | 'gated';
+    signInUrl?: string;
+    openPaths?: string;
+    grantDays?: number;
+    title?: string;
+  };
   og?: { bg?: string; accent?: string; text?: string; muted?: string };
   intake_mode?: 'source-grounded' | 'authored-canon';
   skill_prefix?: string;

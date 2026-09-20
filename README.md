@@ -88,16 +88,26 @@ import ChangelogWidget from '@theme/ChangelogWidget';
 The middleware's order is load-bearing and lives in the package: training crawlers get 403
 first, then the share layer answers `/s/mint` and `/s/<sig>/<route>`, then the gate refuses.
 
-**The family password gate ships in the package.** Set `WIKI_PASSWORD` and `WIKI_GATE_SECRET`
-on the deployment and the wiki is gated; unset them and the same file is an open wiki:
+**The gate is declared in `wiki.config.json`, and the middleware reads it.** The template's
+`middleware.ts` is two lines plus the matcher literal, and changing the gate is a config edit:
 
 ```ts
-import { createMiddleware, createPasswordGate } from '@supersuit/docusaurus-preset-wiki/middleware';
-export default createMiddleware({ gate: createPasswordGate() });
+import wiki from './wiki.config.json';
+import { createMiddlewareFromConfig } from '@supersuit/docusaurus-preset-wiki/middleware';
+export default createMiddlewareFromConfig(wiki);
 export const config = { matcher: [/* the literal above */], runtime: 'edge' };
 ```
 
-Set it from the wiki root after `vercel link`, never by hand:
+```json
+"gate": { "type": "password" }           // the default when the block is absent
+"gate": { "type": "password", "machinePaths": "gated" }
+"gate": { "type": "freedom-account" }    // for people running Freedom
+"gate": { "type": "none" }               // never gated, whatever the project holds
+```
+
+`password` is the family password gate: dark until `WIKI_PASSWORD` and `WIKI_GATE_SECRET` are set
+on the deployment, gated the moment they are. Set it from the wiki root after `vercel link`,
+never by hand:
 
 ```bash
 wiki gate set --password "the word"      # mints the secrets, reads back, redeploys, checks live
@@ -105,7 +115,26 @@ wiki gate link /some/page --password "the word"
 wiki gate set --rotate-secrets           # every ticket and share link ever issued stops working
 ```
 
-For a wiki that is for Freedom operators only, `createMiddleware({ gate: createFreedomAccountGate({ signInUrl }) })` replaces the password with the portal's Google sign-in: a stranger's one button goes to `<signInUrl>?to=<url>`, an active Freedom account comes back with a five-minute `?pass=` the gate swaps for a seven-day grant, and the portal's hourly `?k=` link still skips the door. `WIKI_PASS_SECRET` (or `WIKI_GATE_SECRET`) must match the portal's. See `src/gate/accountGate.ts`.
+`freedom-account` is the door for people running Freedom: a stranger's one button goes to the
+Freedom portal's sign-in (`signInUrl`, default `https://freedom.continentalworks.ai/wiki/sign-in`)
+carrying the page they asked for; an active Freedom account comes back with a five-minute `?pass=`
+the gate swaps for a seven-day grant; the portal's hourly `?k=` link from `/freedom:profile` skips
+the door. `WIKI_PASS_SECRET` (or `WIKI_GATE_SECRET`) must match the portal's, and a `WIKI_PASSWORD`
+on such a project opens nothing. `openPaths` (a regex source) replaces the default set of paths
+served without sign-in, for a wiki whose `/skills/` is a docs reference. One command sets it:
+
+```bash
+wiki gate set --type freedom-account --pass-secret "<the portal's value>"   # writes gate.type, sets the env, drops WIKI_PASSWORD, redeploys, checks live
+wiki gate status                          # on an account wiki: no password needed, the key is read from the project
+wiki gate link /some/page                 # the hourly ?k= link an operator gets
+```
+
+`pnpm share` on an account wiki unlocks with `WIKI_KEY` (the hourly key; the Freedom plugin's
+`wikiKey()` fetches it with the operator's own login) and mints the focused one-page link as usual.
+
+The gate functions are also exported on their own (`createPasswordGate`, `createFreedomAccountGate`)
+for a middleware that composes them by hand; `gateFromConfig` is what `createMiddlewareFromConfig`
+calls. See `src/gate/`.
 
 A preloaded link is `<any page>?key=<password>`: it sets a thirty-day ticket cookie and lands the
 reader on the page, with the key stripped from the address. Any capitalization of the password

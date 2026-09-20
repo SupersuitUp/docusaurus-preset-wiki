@@ -91,9 +91,16 @@ export const config = {
 };
 `;
 
-export const OPEN_MIDDLEWARE = () => `// Vercel Routing Middleware for an OPEN wiki: the family bot-block and the one-page share
-// layer, from the preset. A gated wiki: createMiddleware({ gate: createPasswordGate() }).
-export { default } from '${PKG}/middleware';
+export const OPEN_MIDDLEWARE = () => `// Vercel Routing Middleware: the family bot-block, the one-page share layer, and whatever gate
+// wiki.config.json declares, all from the preset. With no \`gate\` block this is the family
+// password gate, dark until WIKI_PASSWORD and WIKI_GATE_SECRET are set on the deployment
+// (\`wiki gate set --password "<word>"\`); \`"gate": { "type": "freedom-account" }\` is the door
+// for people running Freedom (\`wiki gate set --type freedom-account --pass-secret ...\`);
+// \`"type": "none"\` is never gated. Changing the gate is a config edit, never an edit here.
+import wiki from './wiki.config.json';
+import { createMiddlewareFromConfig } from '${PKG}/middleware';
+
+export default createMiddlewareFromConfig(wiki);
 
 ${CONFIG_BLOCK()}`;
 
@@ -104,9 +111,12 @@ ${machinePaths === "gated" ? `// machinePaths 'gated' puts .md, .txt, audio, vid
 // every page. 'open' serves them to anyone, which on a private wiki publishes the whole corpus
 // as /llms-full.txt. Written closed by the migration because the gate it replaced was this
 // wiki's own; open it only if that is what this wiki's content wants.
-` : ""}import { createMiddleware, createPasswordGate } from '${PKG}/middleware';
+` : ""}// The gate is read from wiki.config.json (\`"gate": { "type": "password"${machinePaths ? `, "machinePaths": "${machinePaths}"` : ""} }\`);
+// changing it is a config edit, never an edit here.
+import wiki from './wiki.config.json';
+import { createMiddlewareFromConfig } from '${PKG}/middleware';
 
-export default createMiddleware({ gate: createPasswordGate(${machinePaths ? `{ machinePaths: '${machinePaths}' }` : ""}) });
+export default createMiddlewareFromConfig(wiki);
 
 ${CONFIG_BLOCK()}`;
 
@@ -215,7 +225,15 @@ export function migrate() {
       // (ContinentalWorks/freedom#159, 2026-09-17). So: keep theirs, write ours closed, exit 3.
       if (!DRY) renameSync(rel("middleware.ts"), rel("middleware.pre-package.ts"));
       write("middleware.ts", PASSWORD_MIDDLEWARE({ machinePaths: "gated" }));
-      warnings.push("middleware.ts was this wiki's own password gate; kept as middleware.pre-package.ts. The package gate is written CLOSED (createPasswordGate({ machinePaths: 'gated' })): .md, .txt, audio and /llms-full.txt answer 401 without the key. If this wiki's machine paths were open on purpose, change it to 'open'; if your gate carried anything else (an allowlist, a second door), carry it into createMiddleware({ gate }). Then delete the kept file and commit both by name.");
+      // The middleware reads its gate from wiki.config.json, so the closed setting has to be
+      // written THERE; the comment in middleware.ts only says where to look.
+      const cfgPath = rel("wiki.config.json");
+      if (existsSync(cfgPath)) {
+        const cfg = JSON.parse(read("wiki.config.json"));
+        cfg.gate = { ...(cfg.gate && typeof cfg.gate === "object" ? cfg.gate : {}), type: "password", machinePaths: "gated" };
+        write("wiki.config.json", JSON.stringify(cfg, null, 2) + "\n");
+      }
+      warnings.push("middleware.ts was this wiki's own password gate; kept as middleware.pre-package.ts. The package gate is written CLOSED (wiki.config.json gate: { type: 'password', machinePaths: 'gated' }): .md, .txt, audio and /llms-full.txt answer 401 without the key. If this wiki's machine paths were open on purpose, change machinePaths to 'open' in wiki.config.json; if your gate carried anything else (an allowlist, a second door), carry it into createMiddleware({ gate }). Then delete the kept file and commit both by name.");
     } else write("middleware.ts", OPEN_MIDDLEWARE());
   } else {
     write("middleware.ts", OPEN_MIDDLEWARE());

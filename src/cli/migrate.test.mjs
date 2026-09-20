@@ -54,7 +54,7 @@ test('migrate turns a wiki-template v1.1.3 tree into a package consumer', { skip
   assert.match(cfg, /defineWikiConfig\(wiki\)/);
   assert.equal(existsSync(join(d, 'docusaurus.config.pre-package.ts')), false, 'the template config had no per-wiki choices, so nothing is kept aside');
   const mw = readFileSync(join(d, 'middleware.ts'), 'utf8');
-  assert.match(mw, /export \{ default \} from '@supersuit\/docusaurus-preset-wiki\/middleware'/);
+  assert.match(mw, /export default createMiddlewareFromConfig\(wiki\)/);
   assert.match(mw, /export const config = \{/);
   assert.equal(spawnSync(process.execPath, [BIN, 'check', 'middleware'], { cwd: d, encoding: 'utf8' }).status, 0, 'the written literal passes the check');
   assert.equal(spawnSync(process.execPath, [BIN, 'check', 'owned-files'], { cwd: d, encoding: 'utf8' }).status, 0, 'nothing owned is left');
@@ -82,7 +82,8 @@ test('a password-gated middleware is the wiki\'s OWN: kept aside, the package ga
   assert.match(r.stdout, /NEEDS A PERSON: middleware\.ts was this wiki's own password gate/);
   assert.equal(readFileSync(join(d, 'middleware.pre-package.ts'), 'utf8'), own, 'the operator\'s gate is kept byte for byte');
   const mw = readFileSync(join(d, 'middleware.ts'), 'utf8');
-  assert.match(mw, /createPasswordGate\(\{ machinePaths: 'gated' \}\)/, 'the false positive costs a re-run; the false negative costs a published corpus');
+  assert.match(mw, /createMiddlewareFromConfig\(wiki\)/, 'the gate is read from the config');
+  assert.deepEqual(JSON.parse(readFileSync(join(d, 'wiki.config.json'), 'utf8')).gate, { type: 'password', machinePaths: 'gated' }, 'the false positive costs a re-run; the false negative costs a published corpus');
   assert.equal(spawnSync(process.execPath, [BIN, 'check', 'middleware'], { cwd: d, encoding: 'utf8' }).status, 0, 'the written literal still passes the check');
   const again = spawnSync(process.execPath, [BIN, 'migrate', '--no-install', '--no-build'], { cwd: d, encoding: 'utf8' });
   assert.equal(again.status, 2); assert.match(again.stderr, /wiki upgrade/);

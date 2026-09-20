@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import {
   decide, opens, candidateUrl, withSlug, existingSlugFor,
   shareMechanism, mintFocusedLink,
-  OPEN, UNLOCKED, BLOCKED, MINTABLE,
+  OPEN, UNLOCKED, BLOCKED, MINTABLE, unlockParamFor,
 } from "./unlock-link.mjs";
 
 const PAGE = "https://example.wiki/concepts/thing";
@@ -244,4 +244,20 @@ test("mintFocusedLink hands back the edge's url with the cookie it was given, an
   assert.match(refused.why, /401/);
   const down = await mintFocusedLink("https://example.wiki", "/concepts/thing", "", async () => { throw new Error("ECONNRESET"); });
   assert.equal(down.url, null);
+});
+
+test("on a Freedom-account wiki (?k=) the messages name the account key, never a password", () => {
+  const share = { kind: "signed-route", prefix: "/s/", mint: "/s/mint", file: "src/share/handleShare.ts" };
+  const r = decide("https://w/x", { param: "k", password: "", share }, { bare: { status: 401 }, keyed: { status: 0 } });
+  assert.equal(r.outcome, MINTABLE);
+  assert.match(r.why, /no account key is available to put in \?k=/);
+  assert.match(r.ask, /WIKI_KEY/);
+  assert.doesNotMatch(r.ask, /WIKI_PASSWORD/);
+});
+
+test("unlockParamFor follows gate.type and the declared value wins", () => {
+  assert.equal(unlockParamFor(undefined), "key");
+  assert.equal(unlockParamFor({ type: "freedom-account" }), "k");
+  assert.equal(unlockParamFor({ type: "none" }), null);
+  assert.equal(unlockParamFor({ type: "freedom-account", unlockParam: "pass" }), "pass");
 });

@@ -20,6 +20,7 @@
 
 import { handleShare, type ShareRequest } from './share/handleShare';
 import matcherJson from './cli/matcher.json';
+import { gateFromConfig as gateFromConfigFn, type WikiGateConfig as WikiGateConfigShape } from './gate/fromConfig';
 
 export { handleShare };
 export type { ShareRequest };
@@ -127,3 +128,17 @@ export { createPasswordGate, hasValidTicket } from './gate/passwordGate';
 export type { PasswordGateOptions } from './gate/passwordGate';
 export { createFreedomAccountGate, hasValidGrant, hourKey, mintPass, grantCookieValue, DEFAULT_OPEN_PATHS } from './gate/accountGate';
 export type { AccountGateOptions } from './gate/accountGate';
+export { gateFromConfig, unlockParamFor } from './gate/fromConfig';
+export type { WikiGateConfig, WikiGateType } from './gate/fromConfig';
+
+/**
+ * The whole middleware of a wiki, from its wiki.config.json: bot-block, share layer, and the
+ * gate the `gate` block declares (src/gate/fromConfig.ts). The instance's middleware.ts is then
+ * two lines plus the matcher literal, and changing the gate is a config edit:
+ *
+ *   import wiki from './wiki.config.json';
+ *   export default createMiddlewareFromConfig(wiki);
+ */
+export function createMiddlewareFromConfig(wiki: { gate?: WikiGateConfigShape }) {
+  return createMiddleware({ gate: gateFromConfigFn(wiki.gate) });
+}

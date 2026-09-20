@@ -75,9 +75,19 @@ export function unlockParam(root = ROOT) {
   const cfg = join(root, "wiki.config.json");
   if (existsSync(cfg)) {
     const g = JSON.parse(readFileSync(cfg, "utf8")).gate;
-    if (g && typeof g === "object" && g.unlockParam !== undefined) return g.unlockParam;
+    return unlockParamFor(g && typeof g === "object" ? g : undefined);
   }
   return "key";
+}
+
+/** The rule src/gate/fromConfig.ts applies at the edge, repeated here because the CLI cannot
+ *  import the TypeScript: declared wins; else `key` for a password wiki, `k` (the portal's
+ *  hourly account key) for a freedom-account wiki, none for type `none`. */
+export function unlockParamFor(gate) {
+  if (gate?.unlockParam !== undefined) return gate.unlockParam;
+  const type = gate?.type ?? "password";
+  if (type === "none") return null;
+  return type === "freedom-account" ? "k" : "key";
 }
 
 /**
@@ -157,6 +167,10 @@ export function candidateUrl(pageUrl, param, password) {
  * `probes` is {bare, keyed} of probe results, gathered by the caller.
  */
 export function decide(pageUrl, { param, password, share = null }, probes) {
+  // What the caller sets to open a link: the hourly account key on a Freedom-account wiki, the
+  // password everywhere else. Every message below names the right one.
+  const cred = param === "k" ? "WIKI_KEY (the portal's hourly account key)" : "WIKI_PASSWORD";
+  const credWord = param === "k" ? "account key" : "password";
   if (opens(probes.bare)) {
     return { outcome: OPEN, url: pageUrl, checked: probes.bare.status };
   }
@@ -168,8 +182,8 @@ export function decide(pageUrl, { param, password, share = null }, probes) {
     outcome: MINTABLE, url: null, checked, why,
     ask: share.kind === "signed-route"
       ? `this wiki serves one page at a time at a signed ${share.prefix}<sig>/<route> address, minted `
-        + `by its edge at ${share.mint} for an authorized reader. Minting needs the password once: set `
-        + `WIKI_PASSWORD in this shell or run \`vercel env pull\` in this repo, then run this again.`
+        + `by its edge at ${share.mint} for an authorized reader. Minting needs the credential once: set `
+        + `${cred} in this shell (a password also comes from \`vercel env pull\`), then run this again.`
       : `this wiki serves one page at a time at an unguessable ${share.prefix}<slug> address from `
         + `${share.file}, and that needs no password or secret, because it is a code change rather `
         + `than a credential. Run this command again with --mint to add the slug, commit that one `
@@ -180,11 +194,11 @@ export function decide(pageUrl, { param, password, share = null }, probes) {
   if (!candidate) {
     const why = !param
       ? "this wiki declares no unlock parameter, so a query-string link cannot open it"
-      : `the page is ${probes.bare.status} and no password is available to put in ?${param}=`;
+      : `the page is ${probes.bare.status} and no ${credWord} is available to put in ?${param}=`;
     if (share) return mintable(probes.bare.status, why);
     return {
       outcome: BLOCKED, url: null, checked: probes.bare.status, why,
-      ask: "set WIKI_PASSWORD in this shell, or run `vercel env pull` in this repo first. "
+      ask: `set ${cred} in this shell, or for a password run \`vercel env pull\` in this repo first. `
          + "If the variable is marked SENSITIVE on the project, it cannot be read at all and "
          + "the link has to come from a human.",
     };
@@ -192,11 +206,11 @@ export function decide(pageUrl, { param, password, share = null }, probes) {
   if (opens(probes.keyed)) {
     return { outcome: UNLOCKED, url: candidate, checked: probes.keyed.status };
   }
-  const rotated = `?${param}= with the available password did not open it (${probes.keyed.status}); it may have been rotated`;
+  const rotated = `?${param}= with the available ${credWord} did not open it (${probes.keyed.status}); it may have been rotated`;
   if (share) return mintable(probes.keyed.status, rotated);
   return {
     outcome: BLOCKED, url: null, checked: probes.keyed.status, why: rotated,
-    ask: "confirm the live WIKI_PASSWORD for this project, or get a link from whoever owns it.",
+    ask: `confirm the live ${cred} for this project, or get a link from whoever owns it.`,
   };
 }
 
@@ -246,8 +260,14 @@ if (invokedDirectly) {
   };
   const probe = follow;
 
+  // THE CREDENTIAL IS WHATEVER THE UNLOCK PARAMETER TAKES. On a password wiki `?key=` takes
+  // WIKI_PASSWORD. On a Freedom-account wiki (`?k=`) it takes the portal's hourly account key,
+  // which only a signed-in operator can get: the Freedom plugin's `wikiKey()` (freedom-profile.mjs)
+  // fetches it from the portal with the operator's own login, and the caller puts it in WIKI_KEY.
+  // There is no password to read from any file.
   let password = process.env.WIKI_PASSWORD ?? "";
-  if (!password) {
+  if (unlockParam() === "k") password = process.env.WIKI_KEY ?? "";
+  if (!password && unlockParam() !== "k") {
     for (const f of [".env.local", ".env.production.local", ".env"]) {
       const p = join(ROOT, f);
       if (!existsSync(p)) continue;

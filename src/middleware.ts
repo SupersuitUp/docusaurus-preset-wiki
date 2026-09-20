@@ -45,14 +45,8 @@ export const UNFURL_BOT_PATTERN =
 export const BLOCKED_BOT_PATTERN =
   /\b(GPTBot|OAI-SearchBot|ChatGPT-User|ClaudeBot|Claude-Web|anthropic-ai|CCBot|Google-Extended|GoogleOther|Applebot-Extended|FacebookBot|Meta-ExternalAgent|meta-externalagent|Bytespider|PerplexityBot|Perplexity-User|Amazonbot|AI2Bot|cohere-ai|Diffbot|Omgili|ImagesiftBot|YouBot|DuckAssistBot|peer39_crawler|TimpiBot|Webzio-Extended|Kangaroo|Cotoyogi)\b/i;
 
-export interface GateVerdict {
-  authorized: boolean;
-  /** What to send when not authorized: the login page, or a 303 that sets the cookie
-   *  for a `?key=` prefilled link. Ignored when `authorized` is true. */
-  response?: Response;
-}
-
-export type GateFn = (request: Request) => Promise<GateVerdict> | GateVerdict;
+import type { GateFn, GateVerdict } from './gate/types';
+export type { GateFn, GateVerdict };
 
 export interface MiddlewareOptions {
   /** Absent means an open wiki: every reader is authorized and share addresses redirect. */

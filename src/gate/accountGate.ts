@@ -37,7 +37,7 @@
 //
 // EDGE-SAFE: Web Crypto only, no Node built-ins.
 
-import type { GateFn, GateVerdict } from '../middleware';
+import type { GateFn, GateVerdict } from './types';
 
 export interface AccountGateOptions {
   /** The portal page that signs a reader in and bounces them back: `<signInUrl>?to=<url>`. */

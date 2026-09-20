@@ -22,7 +22,7 @@
 //
 // EDGE-SAFE: Web Crypto only, no Node built-ins.
 
-import type { GateFn, GateVerdict } from '../middleware';
+import type { GateFn, GateVerdict } from './types';
 
 export interface PasswordGateOptions {
   /** Defaults to process.env.WIKI_PASSWORD, read per request. */

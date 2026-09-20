@@ -34,6 +34,15 @@ export function changelogBetween(changelog, from, to) {
   return sections.filter((s) => { const v = ver(s); return v && (!from || cmp(v, from) > 0) && (!to || cmp(v, to) <= 0); });
 }
 
+/** Add `prepare: wiki install-hooks` to the package.json ON DISK, reading it fresh so nothing
+ *  the install just wrote (the new specifier) is lost. Returns true when it changed. */
+export function addPrepareToPackageJson(pkgPath) {
+  const fresh = JSON.parse(readFileSync(pkgPath, "utf8"));
+  if (!ensurePrepare(fresh)) return false;
+  writeFileSync(pkgPath, JSON.stringify(fresh, null, 2) + "\n");
+  return true;
+}
+
 export function upgrade() {
   const pkgPath = join(ROOT, "package.json");
   if (!existsSync(pkgPath)) { console.error("[upgrade] run this in a wiki root"); return 2; }
@@ -59,10 +68,12 @@ export function upgrade() {
   // 1.8.0: the page-dates snapshot refreshes from a pre-commit hook, installed by `prepare`.
   // An instance upgraded from an earlier release has no such script, so add it and install
   // the hook now rather than on the next install.
-  if (ensurePrepare(pkg)) {
-    writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-    log("package.json: added `prepare: wiki install-hooks`");
-  }
+  //
+  // RE-READ package.json first. `pnpm add` above rewrote it (the new specifier), and 1.8.1
+  // wrote the `pkg` object read BEFORE the install back over it: the dependency line went
+  // back to its old range while the lockfile carried the new one, and every one of the 17
+  // wikis upgraded on 2026-09-20 failed its Vercel install with ERR_PNPM_OUTDATED_LOCKFILE.
+  if (addPrepareToPackageJson(pkgPath)) log("package.json: added `prepare: wiki install-hooks`");
   const h = spawnSync(process.execPath, [join(HERE, "install-hooks.mjs")], { cwd: ROOT, stdio: "inherit" });
   if (h.status !== 0) { console.error("[upgrade] install-hooks failed"); return 1; }
   if (!args.includes("--no-build")) {

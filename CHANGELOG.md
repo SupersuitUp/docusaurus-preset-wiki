@@ -5,6 +5,10 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.8.2 (2026-09-20)
+
+- `wiki upgrade` re-reads package.json after the package manager has written the new specifier before it adds `prepare`. 1.8.1 wrote the object it had read BEFORE the install back over the file, so the dependency line went back to its old range while the lockfile carried the new one, and all 17 wikis upgraded that evening failed their Vercel install with `ERR_PNPM_OUTDATED_LOCKFILE` (repaired by hand, one commit each). `addPrepareToPackageJson` is the tested piece.
+
 ## 1.8.1 (2026-09-20)
 
 Two rules that had lived in one wiki's copy of the creation-date plugin each, lifted into the shared collector. They were committed under a force-moved `v1.8.0` tag after 1.8.0 had already published, and the publish workflow rightly refused the version, so they ship here.

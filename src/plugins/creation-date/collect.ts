@@ -22,6 +22,8 @@ export interface History {
   pageDates: Record<string, PageDates>;
   /** Every page in the working tree that is built (not draft, not hidden). Live git only; never in the snapshot. */
   liveDocKeys?: string[];
+  /** The public route of every live page, so a snapshot row can be checked against what is served. */
+  liveRoutePaths?: string[];
 }
 
 export interface ChangeEvent {
@@ -426,7 +428,8 @@ export function collectHistory(siteDir: string): History {
   const liveDocKeys = [...currentMeta.keys()].filter(
     (k) => !k.split('/').some((s) => s.startsWith('_')) && !hiddenDocKeys.has(bareKey(k)),
   );
-  return { changeEvents: sortNewestFirst(events), pageDates, liveDocKeys };
+  const liveRoutePaths = liveDocKeys.map((k) => currentMeta.get(k)!.routePath);
+  return { changeEvents: sortNewestFirst(events), pageDates, liveDocKeys, liveRoutePaths };
 }
 
 /** Snapshot and live git, merged per page: the earliest birth and the latest touch win. */

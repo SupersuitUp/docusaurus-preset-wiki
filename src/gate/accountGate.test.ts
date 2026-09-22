@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { createMiddleware } from '../middleware';
-import { createFreedomAccountGate, hourKey, mintPass, grantCookieValue } from './accountGate';
+import { createFreedomAccountGate, hourKey, namedHourKey, mintPass, grantCookieValue } from './accountGate';
 
 const SECRET = 'test-secret';
 const SIGN_IN = 'https://freedom.example/wiki/sign-in';
@@ -80,6 +80,59 @@ test('the hourly account key (?k=) still opens the door, this hour and the last,
   assert.equal(stale?.status, 401, 'two hours ago is refused');
   const wrongSecret = await mw(req(`https://t.wiki/x?k=${await hourKey(SECRET, now)}`));
   assert.equal(wrongSecret?.status, 401, 'the pass secret does not mint keys');
+});
+
+test('the named key matches node:crypto and a fixed vector the portal test shares', async () => {
+  const oracle = (secret: string, msg: string) => createHmac('sha256', secret).update(msg).digest('hex').slice(0, 32);
+  const at = 3_600_000 * 494000 + 17;
+  // SHARED VECTOR: continental-works-web/src/app/api/wiki-key/wiki-key.test.mjs asserts the same strings.
+  assert.equal(await namedHourKey('vector-secret', at, 'Uq1Zx9_-acct'), 'Uq1Zx9_-acct.eb98741b11794f996d518302388b558c');
+  assert.equal(await hourKey('vector-secret', at), 'ca70f3b196d3924c25b94b4511d09379');
+  assert.equal(await namedHourKey('s', at, 'u1'), `u1.${oracle('s', 'wiki-gate:494000:u1')}`);
+  await assert.rejects(namedHourKey('s', at, 'bad.uid'), /uid/);
+});
+
+test('a named key opens the door this hour and the last, and its grant names the account', async () => {
+  const mw = gated({ keySecret: 'key-secret' });
+  const now = Date.now();
+  const res = await mw(req(`https://t.wiki/concepts/x?k=${await namedHourKey('key-secret', now, 'acct_42')}&y=1`));
+  assert.equal(res?.status, 303);
+  assert.equal(res!.headers.get('location'), '/concepts/x?y=1');
+  assert.match(res!.headers.get('set-cookie') ?? '', /^fw_gate=v1\.acct_42\.\d+\.[a-f0-9]{32};/);
+  const last = await mw(req(`https://t.wiki/x?k=${await namedHourKey('key-secret', now - 3_600_000, 'acct_42')}`));
+  assert.match(last!.headers.get('set-cookie') ?? '', /^fw_gate=v1\.acct_42\./, 'previous hour');
+  const stale = await mw(req(`https://t.wiki/x?k=${await namedHourKey('key-secret', now - 2 * 3_600_000, 'acct_42')}`));
+  assert.equal(stale?.status, 401, 'two hours ago is refused');
+
+  // The verdict on the grant carries the uid, which is what reader analytics read.
+  const gate = createFreedomAccountGate({ signInUrl: SIGN_IN, secret: SECRET, keySecret: 'key-secret' });
+  const verdict = await gate(req('https://t.wiki/x', { cookie: cookieOf(res!) }));
+  assert.equal(verdict.authorized, true);
+  assert.equal(verdict.reader, 'acct_42');
+  const bare = await mw(req(`https://t.wiki/x?k=${await hourKey('key-secret', now)}`));
+  assert.equal((await gate(req('https://t.wiki/x', { cookie: cookieOf(bare!) }))).reader, 'key', 'the bare key still reads as key');
+});
+
+test('a named key with the wrong uid, a wrong sig, a foreign secret or a bad shape is the door', async () => {
+  const mw = gated({ keySecret: 'key-secret' });
+  const now = Date.now();
+  const good = await namedHourKey('key-secret', now, 'acct_42');
+  const sig = good.split('.')[1];
+  const tries = {
+    'uid swapped': `someone_else.${sig}`,
+    'sig forged': `acct_42.${'0'.repeat(32)}`,
+    'foreign secret': await namedHourKey(SECRET, now, 'acct_42'),
+    'bare sig of the named key': sig,
+    'three parts': `${good}.x`,
+    'bad uid chars': `a%20b.${sig}`,
+    'empty uid': `.${sig}`,
+    'short sig': `acct_42.${sig.slice(1)}`,
+  };
+  for (const [why, k] of Object.entries(tries)) {
+    const res = await mw(req(`https://t.wiki/x?k=${encodeURIComponent(k)}`));
+    assert.equal(res?.status, 401, why);
+    assert.equal(res!.headers.get('set-cookie'), null, why);
+  }
 });
 
 test('the key secret defaults to the pass secret when none is given', async () => {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import * as path from 'path';
 import { createMiddleware, createMiddlewareFromConfig, MATCHER } from '../middleware';
-import { createFreedomAccountGate, grantCookieValue, readSinkFor } from '../gate/accountGate';
+import { createFreedomAccountGate, grantCookieValue, readSinkFor, namedHourKey, hourKey } from '../gate/accountGate';
 import { createPasswordGate } from '../gate/passwordGate';
 import {
   READ_PATH, READ_SIG_HEADER, signReadBody, resolveSink, sameSiteRoute, cleanRef, deviceOf, buildEvent, dispatch,
@@ -79,6 +79,15 @@ test('a key grant reads as "key", no grant as "anonymous", the password ticket a
   const res = await createMiddleware({ gate: pw, fetch: r2.fetchImpl, analytics: { endpoint: SINK, secret: 's' } })(beacon('{"path":"/a"}', { cookie: ticket }));
   assert.equal(res?.status, 204);
   assert.equal(r2.events()[0].reader, 'password', 'the password gate never saw the beacon body as a form');
+});
+
+test('a grant bought with a NAMED key reports that account as the reader; the bare key still reports "key"', async () => {
+  const r = recorder();
+  const mw = accountMw(r.fetchImpl);
+  const cookieFrom = async (k: string) => ((await mw(new Request(`https://t.wiki/x?k=${k}`)))!.headers.get('set-cookie') ?? '').split(';')[0];
+  await mw(beacon('{"path":"/a"}', { cookie: await cookieFrom(await namedHourKey(SECRET, Date.now(), 'acct_42')) }));
+  await mw(beacon('{"path":"/b"}', { cookie: await cookieFrom(await hourKey(SECRET, Date.now())) }));
+  assert.deepEqual(r.events().map((e) => [e.path, e.reader]), [['/a', 'acct_42'], ['/b', 'key']]);
 });
 
 test('a reader named in the beacon body is ignored: only the cookie names anyone', async () => {

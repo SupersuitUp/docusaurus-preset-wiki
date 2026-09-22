@@ -131,7 +131,9 @@ wiki gate set --rotate-secrets           # every ticket and share link ever issu
 Freedom portal's sign-in (`signInUrl`, default `https://freedom.continentalworks.ai/wiki/sign-in`)
 carrying the page they asked for; an active Freedom account comes back with a five-minute `?pass=`
 the gate swaps for a seven-day grant; the portal's hourly `?k=` link from `/freedom:profile` skips
-the door. `WIKI_PASS_SECRET` (or `WIKI_GATE_SECRET`) must match the portal's, and a `WIKI_PASSWORD`
+the door. That key comes in two shapes, both accepted: the bare 32-hex key, whose grant reads as
+`key`, and the named `<uid>.<sig>` key (1.10.0, `namedHourKey`), whose grant carries the account id
+so reader analytics name the reader. `WIKI_PASS_SECRET` (or `WIKI_GATE_SECRET`) must match the portal's, and a `WIKI_PASSWORD`
 on such a project opens nothing. `openPaths` (a regex source) replaces the default set of paths
 served without sign-in, for a wiki whose `/skills/` is a docs reference. One command sets it:
 
@@ -178,8 +180,8 @@ rotating it revokes every share link at once.
 first load no navigation reaches the middleware. The theme ships a client module that, on every
 route (the first included), sends `POST /_wiki/read {path, title, ref}` with `navigator.sendBeacon`.
 That is all the browser says. The middleware answers it `204` whatever happens, works out WHO it is
-from the gate's verdict on the signed cookie (the grant's account id, `key` for a grant the hourly
-key bought, `password` on a password wiki, else `anonymous`), and forwards one event to the sink.
+from the gate's verdict on the signed cookie (the grant's account id, including for a grant a named hourly key
+bought, `key` for one the bare hourly key bought, `password` on a password wiki, else `anonymous`), and forwards one event to the sink.
 It also logs the two things a beacon cannot see: a knock on the door (`kind: "door"`, the 401 card
 runs no script) and a served share mirror (`kind: "share"`, `reader: "share"`).
 

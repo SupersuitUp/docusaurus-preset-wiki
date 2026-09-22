@@ -4,6 +4,49 @@
    everything here reads them. Extracted from wiki-template v1.1.3 custom.css lines 41-400. */
 
 /* ============================
+   Text colour tokens
+   ============================
+
+   Every text colour set below reads a token, and every token declares its dark value
+   here, so a rule and the dark half of that rule travel together and cannot be
+   separated by an edit to either one.
+
+   This file used to hardcode thirteen light-mode hex colours and leave dark mode to a
+   hand-written `[data-theme='dark']` block in each instance's own custom.css. That
+   works only while the two agree on every selector. In 1.8.0 the definition line moved
+   from `h1 + p` to `:is(h1, header, .doc-meta-slot) + p`, because the meta row now sits
+   between the title and the line; the instances kept `h1 + p`, which stopped matching.
+   Nothing errored. The rule here still applied, so on every wiki in the family the
+   definition line rendered #555 on a near-black background: 2.5:1, against a 4.5:1
+   floor. It read as a styling opinion rather than a defect, and it shipped for a month.
+
+   An instance may override any token, or any rule below, in its own custom.css: those
+   selectors carry `[data-theme='dark']` and so win on specificity regardless of order.
+
+   src/theme/wiki.css.test.mjs refuses a raw text colour here, and refuses a token with
+   no dark value. */
+
+:root {
+  --wiki-text-body: #1a1a1a;
+  --wiki-text-heading: #0a0a0a;
+  --wiki-text-lede: #555;
+  --wiki-text-quote: #444;
+  --wiki-text-sidebar: #444;
+  --wiki-text-faint: #666;
+  --wiki-code-color: #80412a;
+}
+
+[data-theme='dark'] {
+  --wiki-text-body: #e8e8e8;
+  --wiki-text-heading: #f0f0f0;
+  --wiki-text-lede: #a0a0a0;
+  --wiki-text-quote: #b0b0b0;
+  --wiki-text-sidebar: #b0b0b0;
+  --wiki-text-faint: #9a9a9a;
+  --wiki-code-color: #d4d4d4;
+}
+
+/* ============================
    Article container
    ============================ */
 
@@ -17,7 +60,7 @@
 .markdown {
   font-size: 1.0625rem;
   line-height: 1.7;
-  color: #1a1a1a;
+  color: var(--wiki-text-body);
 }
 
 /* ============================
@@ -64,7 +107,7 @@
   line-height: 1.15;
   margin-top: 0.5rem;
   margin-bottom: 1rem;
-  color: #0a0a0a;
+  color: var(--wiki-text-heading);
 }
 
 .markdown h2 {
@@ -77,7 +120,7 @@
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--ifm-color-emphasis-200);
-  color: #0a0a0a;
+  color: var(--wiki-text-heading);
 }
 
 .markdown h3 {
@@ -88,7 +131,7 @@
   line-height: 1.3;
   margin-top: 2.25rem;
   margin-bottom: 0.75rem;
-  color: #0a0a0a;
+  color: var(--wiki-text-heading);
 }
 
 .markdown h4 {
@@ -98,7 +141,7 @@
   line-height: 1.35;
   margin-top: 1.75rem;
   margin-bottom: 0.6rem;
-  color: #0a0a0a;
+  color: var(--wiki-text-heading);
 }
 
 /* ============================
@@ -112,13 +155,13 @@
 .markdown :is(h1, header, .doc-meta-slot) + p > em:only-child,
 .markdown :is(h1, header, .doc-meta-slot) + p em:first-child:last-child {
   font-size: 1.1rem;
-  color: #555;
+  color: var(--wiki-text-lede);
   line-height: 1.5;
 }
 
 .markdown :is(h1, header, .doc-meta-slot) + p:has(> em:only-child) {
   font-size: 1.1rem;
-  color: #555;
+  color: var(--wiki-text-lede);
   margin-top: 0.25rem;
   margin-bottom: 1.5rem;
   line-height: 1.5;
@@ -160,7 +203,7 @@
   margin: 1.5rem 0;
   padding: 0.25rem 0 0.25rem 1.25rem;
   border-left: 3px solid var(--ifm-color-primary);
-  color: #444;
+  color: var(--wiki-text-quote);
   font-style: italic;
   background: transparent;
 }
@@ -188,7 +231,7 @@
   padding: 0.1em 0.4em;
   border-radius: 3px;
   font-size: 0.92em;
-  color: #80412a;
+  color: var(--wiki-code-color);
 }
 
 /* ============================
@@ -275,7 +318,7 @@ button[aria-label="Copy link to this page"]:hover {
   line-height: 1.45;
   padding: 0.4rem 0.75rem;
   border-radius: 4px;
-  color: #444;
+  color: var(--wiki-text-sidebar);
 }
 
 .menu__link:hover {
@@ -295,7 +338,7 @@ button[aria-label="Copy link to this page"]:hover {
   letter-spacing: -0.01em;
   text-transform: lowercase;
   font-size: 0.8rem;
-  color: #0a0a0a;
+  color: var(--wiki-text-heading);
 }
 
 .menu__caret {
@@ -313,7 +356,7 @@ button[aria-label="Copy link to this page"]:hover {
 }
 
 .table-of-contents__link {
-  color: #666;
+  color: var(--wiki-text-faint);
   line-height: 1.5;
   padding: 0.2rem 0;
 }
@@ -356,7 +399,7 @@ button[aria-label="Copy link to this page"]:hover {
   border-top: 1px solid var(--ifm-color-emphasis-200);
   padding: 1.5rem 1rem;
   font-size: 0.85rem;
-  color: #666;
+  color: var(--wiki-text-faint);
 }
 
 .footer__copyright {

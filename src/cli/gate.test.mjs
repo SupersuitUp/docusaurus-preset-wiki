@@ -60,3 +60,16 @@ test('writeGateType edits only the gate block of wiki.config.json and keeps ever
   writeGateType(dir, 'password');
   assert.deepEqual(JSON.parse(readFileSync(join(dir, 'wiki.config.json'), 'utf8')).gate, { type: 'password' });
 });
+
+test('freedom-account never mints or rotates the key secret: the hourly key is the portal\'s', () => {
+  const fresh = planEnv([], { type: 'freedom-account', random: rnd });
+  assert.deepEqual(fresh.map((s) => [s.key, s.action]), [['WIKI_SHARE_SECRET', 'create']], 'a minted WIKI_GATE_SECRET would make every ?k= link meet the door');
+  const rotated = planEnv([{ key: 'WIKI_GATE_SECRET', value: 'g' }, { key: 'WIKI_SHARE_SECRET', value: 's' }], { type: 'freedom-account', rotateSecrets: true, random: rnd });
+  assert.deepEqual(rotated.map((s) => [s.key, s.action]), [['WIKI_SHARE_SECRET', 'update']]);
+});
+
+test('--key-secret sets WIKI_GATE_SECRET to the portal value, creating or updating', () => {
+  const K = 'K'.repeat(64);
+  assert.deepEqual(planEnv([], { type: 'freedom-account', keySecret: K, random: rnd }).find((s) => s.key === 'WIKI_GATE_SECRET'), { key: 'WIKI_GATE_SECRET', value: K, action: 'create' });
+  assert.deepEqual(planEnv([{ key: 'WIKI_GATE_SECRET', value: 'g' }], { type: 'freedom-account', keySecret: K, random: rnd }).find((s) => s.key === 'WIKI_GATE_SECRET'), { key: 'WIKI_GATE_SECRET', value: K, action: 'update' });
+});

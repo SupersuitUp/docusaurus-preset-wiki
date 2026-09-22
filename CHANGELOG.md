@@ -5,6 +5,16 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.11.0 (2026-09-22)
+
+**Dark mode follows the stylesheet again.** Every text colour here now reads a `--wiki-*` token that declares its dark value in this same file, so a rule and the dark half of that rule cannot be separated by an edit to either one.
+
+- Thirteen hardcoded light-mode colours became seven tokens (`--wiki-text-body`, `-heading`, `-lede`, `-quote`, `-sidebar`, `-faint`, `--wiki-code-color`), each with a `[data-theme='dark']` value. An instance may still override any token or any rule in its own `custom.css`; those selectors carry `[data-theme='dark']` and win on specificity either way.
+- **The defect.** Dark mode lived in each instance's `custom.css` keyed to `h1 + p`. 1.8.0 moved the definition line here to `:is(h1, header, .doc-meta-slot) + p`, because the meta row now sits between the title and the line. The instance overrides stopped matching, this file kept applying, and the italic definition line under every H1 rendered `#555` on a near-black page: **2.5:1, against a 4.5:1 floor.** Measured on 16 of the 20 live wikis that could be read; it read as a styling opinion rather than a defect and shipped for a month.
+- **DETECTOR** (live site or built output, not source): load a doc page, set `data-theme="dark"`, and compute the WCAG contrast of the definition line's computed `color` against its effective background. Below 4.5 is the defect. A source grep encodes one spelling of it; this encodes the defect.
+- **REMEDY** for an instance: `pnpm update @supersuit/docusaurus-preset-wiki`, rebuild, deploy. Every instance's range is a caret, so no `package.json` edit is needed. The stale `h1 + p` dark block in an instance's `custom.css` becomes dead code and is harmless; it can be deleted whenever that file is next touched.
+- `src/theme/wiki.css.test.mjs` refuses a raw text colour in a rule, a token with no dark value, a dark token below 4.5:1 on `#111111`, and a definition-line selector that has lost the meta row.
+
 ## 1.10.2
 
 - On a gated wiki, a `/_wiki/read` beacon from someone the gate would not let in is dropped instead of counted as an `anonymous` read. Nobody reads a gated page without passing the door, so those pings were scripts and stale tabs, and they outnumbered the real reads on the first dashboard (2026-09-21). Still answered 204. Open wikis are unchanged.

@@ -5,6 +5,10 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.10.2
+
+- On a gated wiki, a `/_wiki/read` beacon from someone the gate would not let in is dropped instead of counted as an `anonymous` read. Nobody reads a gated page without passing the door, so those pings were scripts and stale tabs, and they outnumbered the real reads on the first dashboard (2026-09-21). Still answered 204. Open wikis are unchanged.
+
 ## 1.10.1
 
 - `wiki gate set` no longer mints or rotates `WIKI_GATE_SECRET` on a `freedom-account` wiki. The hourly `?k=` key is derived by the portal from ITS secret, so a wiki-local one meant every key link met the door (supersuit.wiki, found 2026-09-21 by the first named-key read). New `--key-secret "<portal's WIKI_GATE_SECRET>"` sets it; without it the command says the key links open the wiki only if the value already matches.

@@ -65,12 +65,13 @@ test('a beacon from a signed-in reader is reported with the grant uid, signed, a
   assert.equal(JSON.stringify(ev).includes('iPhone'), false, 'no raw user agent');
 });
 
-test('a key grant reads as "key", no grant as "anonymous", the password ticket as "password"', async () => {
+test('a key grant reads as "key", the password ticket as "password"; on a gated wiki no grant is no read at all', async () => {
   const r = recorder();
   const mw = accountMw(r.fetchImpl);
   await mw(beacon('{"path":"/a"}', { cookie: await grant('key') }));
-  await mw(beacon('{"path":"/b"}'));
-  assert.deepEqual(r.events().map((e) => e.reader), ['key', 'anonymous']);
+  const dropped = await mw(beacon('{"path":"/b"}'));
+  assert.equal(dropped?.status, 204, 'still answered 204, so a stale tab sees nothing');
+  assert.deepEqual(r.events().map((e) => e.reader), ['key'], 'a beacon the gate would refuse is dropped, never counted as an anonymous read');
 
   const pw = createPasswordGate({ password: 'word', secret: 'pw-secret' })!;
   const login = await createMiddleware({ gate: pw })(new Request('https://t.wiki/x?key=word'));
@@ -92,8 +93,8 @@ test('a grant bought with a NAMED key reports that account as the reader; the ba
 
 test('a reader named in the beacon body is ignored: only the cookie names anyone', async () => {
   const r = recorder();
-  await accountMw(r.fetchImpl)(beacon(JSON.stringify({ path: '/a', reader: 'someone-else' })));
-  assert.equal(r.events()[0].reader, 'anonymous');
+  await accountMw(r.fetchImpl)(beacon(JSON.stringify({ path: '/a', reader: 'someone-else' }), { cookie: await grant('uid-real') }));
+  assert.equal(r.events()[0].reader, 'uid-real');
 });
 
 test('garbage is answered 204 and reported nowhere', async () => {
@@ -121,7 +122,7 @@ test('a sink that throws or hangs never changes the answer', async () => {
 test('with context.waitUntil the send is handed to the runtime and the response does not wait', async () => {
   const r = recorder();
   const handed: Promise<unknown>[] = [];
-  const res = await accountMw(r.fetchImpl)(beacon('{"path":"/a"}'), { waitUntil: (p) => { handed.push(p); } });
+  const res = await accountMw(r.fetchImpl)(beacon('{"path":"/a"}', { cookie: await grant('uid-a') }), { waitUntil: (p) => { handed.push(p); } });
   assert.equal(res?.status, 204);
   assert.equal(handed.length, 1);
   await Promise.all(handed);
@@ -213,8 +214,8 @@ test('the account gate implies the portal sink; createMiddlewareFromConfig carri
     const realFetch = globalThis.fetch;
     globalThis.fetch = r.fetchImpl;
     try {
-      await createMiddlewareFromConfig({ gate: { type: 'freedom-account', signInUrl: SIGN_IN } })(beacon('{"path":"/a"}'));
-      await createMiddlewareFromConfig({ gate: { type: 'freedom-account', signInUrl: SIGN_IN }, analytics: false })(beacon('{"path":"/b"}'));
+      await createMiddlewareFromConfig({ gate: { type: 'freedom-account', signInUrl: SIGN_IN } })(beacon('{"path":"/a"}', { cookie: await grant('uid-a') }));
+      await createMiddlewareFromConfig({ gate: { type: 'freedom-account', signInUrl: SIGN_IN }, analytics: false })(beacon('{"path":"/b"}', { cookie: await grant('uid-a') }));
     } finally { globalThis.fetch = realFetch; }
   } finally { process.env = before; }
   assert.equal(r.sent.length, 1);

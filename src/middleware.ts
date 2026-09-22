@@ -102,14 +102,18 @@ export function createMiddleware(opts: MiddlewareOptions = {}) {
     // sees the beacon's, and the browser's claim is only ever the page.
     if (new URL(request.url).pathname === READ_PATH) {
       if (sink && request.method === 'POST') {
-        let reader = 'anonymous';
+        // On a gated wiki a beacon from someone the gate would NOT let in is dropped, never
+        // counted as an anonymous read: nobody reads a gated page without passing the door, so
+        // such a ping is a script or a stale tab (2026-09-21, it inflated the first dashboard).
+        let reader: string | null = 'anonymous';
         if (opts.gate) {
+          reader = null;
           try {
             const probe = await opts.gate(new Request(request.url, { method: 'GET', headers: request.headers }));
-            if (probe.authorized && probe.reader) reader = probe.reader;
+            if (probe.authorized) reader = probe.reader ?? 'anonymous';
           } catch { /* a gate that throws names nobody */ }
         }
-        const event = await eventFromBeacon(request, reader);
+        const event = reader ? await eventFromBeacon(request, reader) : null;
         if (event) await report(event);
       }
       return readAck();

@@ -9,6 +9,9 @@
 //      page anyone can already read. A GATED wiki wires the same call in with its
 //      own gate's verdict, and then the address serves the chrome-less mirror the
 //      share-view plugin builds, to a reader who has no password and needs none.
+//   After the block, `/_wiki/read` (src/analytics/reads.ts): the reader-analytics beacon, always
+//   204, the reader named by the gate's verdict on the cookie; and door knocks and served share
+//   mirrors are reported beside the responses they already were.
 // No auth or password logic here; a gated wiki adds its gate BELOW the share layer.
 //
 // A wiki with no gate: `export { default, config } from '@supersuit/docusaurus-preset-wiki/middleware'`.
@@ -22,6 +25,10 @@ import { handleShare, type ShareRequest } from './share/handleShare';
 import matcherJson from './cli/matcher.json';
 import { handleSignOut } from './gate/signOut';
 import { gateFromConfig as gateFromConfigFn, type WikiGateConfig as WikiGateConfigShape } from './gate/fromConfig';
+import {
+  READ_PATH, readAck, eventFromBeacon, buildEvent, sendEvent, dispatch, resolveSink, sameSiteRoute, isPrefetch,
+  type AnalyticsOption, type MiddlewareContext, type ReadEvent, type ReadSink,
+} from './analytics/reads';
 
 export { handleShare };
 export type { ShareRequest };
@@ -55,10 +62,22 @@ export interface MiddlewareOptions {
   gate?: GateFn;
   /** The share-signing secret. Defaults to WIKI_SHARE_SECRET, then WIKI_GATE_SECRET. */
   secret?: string;
+  /** Reader analytics (src/analytics/reads.ts). Absent: the gate's default sink if it has one
+   *  (the account gate's portal), else WIKI_ANALYTICS_URL, else nothing. `false` turns it off. */
+  analytics?: AnalyticsOption;
+  /** For tests: the fetch that carries an event to the sink. */
+  fetch?: typeof fetch;
 }
 
+export {
+  READ_PATH, READ_SIG_HEADER, READ_SIG_LABEL, signReadBody, resolveSink, buildEvent, sameSiteRoute,
+} from './analytics/reads';
+export type { ReadEvent, ReadSink, AnalyticsOption, MiddlewareContext } from './analytics/reads';
+
 export function createMiddleware(opts: MiddlewareOptions = {}) {
-  return async function middleware(request: Request): Promise<Response | undefined> {
+  // Vercel calls routing middleware as (request, context); context.waitUntil keeps an event's
+  // send alive after the response is sent. Without it the send is awaited for at most 800 ms.
+  return async function middleware(request: Request, context?: MiddlewareContext): Promise<Response | undefined> {
     const ua = request.headers.get('user-agent') ?? '';
     const isUnfurlBot = UNFURL_BOT_PATTERN.test(ua);
     // Unfurl bots skip the BLOCK here and skip any GATE below, but they do NOT skip
@@ -71,6 +90,29 @@ export function createMiddleware(opts: MiddlewareOptions = {}) {
         'Forbidden: automated training and AI-search crawlers are not permitted on this site.',
         { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } },
       );
+    }
+
+    // Resolved per request because the env is. Null: nothing is ever sent.
+    const sink: ReadSink | null = resolveSink(opts.analytics, opts.gate?.readSink);
+    const report = (event: ReadEvent) => (sink ? dispatch(sendEvent(sink, event, opts.fetch), context) : Promise.resolve());
+
+    // THE READ BEACON comes right after the block and before any verdict is sent: it is always
+    // answered 204, reader or not, sink or not. The reader is the gate's verdict on the SAME
+    // cookies presented as a GET, so a gate that reads a POST body (the password form) never
+    // sees the beacon's, and the browser's claim is only ever the page.
+    if (new URL(request.url).pathname === READ_PATH) {
+      if (sink && request.method === 'POST') {
+        let reader = 'anonymous';
+        if (opts.gate) {
+          try {
+            const probe = await opts.gate(new Request(request.url, { method: 'GET', headers: request.headers }));
+            if (probe.authorized && probe.reader) reader = probe.reader;
+          } catch { /* a gate that throws names nobody */ }
+        }
+        const event = await eventFromBeacon(request, reader);
+        if (event) await report(event);
+      }
+      return readAck();
     }
 
     // SIGN OUT comes right after the block and before any verdict: it needs no credential, it
@@ -96,10 +138,28 @@ export function createMiddleware(opts: MiddlewareOptions = {}) {
       secret,
       gated,
     });
-    if (share) return share;
+    if (share) {
+      // A served mirror is a read the beacon cannot see: the mirror runs no script.
+      const rewrite = share.headers.get('x-middleware-rewrite');
+      if (sink && rewrite && !isUnfurlBot && !isPrefetch(request)) {
+        const mirrored = new URL(rewrite).pathname.replace(/^\/share-view/, '') || '/';
+        const path = sameSiteRoute(mirrored, new URL(request.url).host);
+        if (path) await report(buildEvent(request, { kind: 'share', path, reader: 'share', ref: request.headers.get('referer') }));
+      }
+      return share;
+    }
 
     if (isUnfurlBot) return undefined;
-    if (gated && !verdict.authorized) return verdict.response;
+    if (gated && !verdict.authorized) {
+      // A knock on the door is the other thing the beacon cannot see: the 401 card runs no script.
+      const res = verdict.response;
+      if (sink && res && res.status === 401 && request.method === 'GET' && !isPrefetch(request)
+          && /text\/html/.test(res.headers.get('content-type') ?? '')) {
+        const path = sameSiteRoute(new URL(request.url).pathname, new URL(request.url).host);
+        if (path) await report(buildEvent(request, { kind: 'door', path, reader: 'anonymous', ref: request.headers.get('referer') }));
+      }
+      return res;
+    }
     // Implicit undefined return lets the request continue to the static site.
     return undefined;
   };
@@ -150,6 +210,6 @@ export type { WikiGateConfig, WikiGateType } from './gate/fromConfig';
  *   import wiki from './wiki.config.json';
  *   export default createMiddlewareFromConfig(wiki);
  */
-export function createMiddlewareFromConfig(wiki: { gate?: WikiGateConfigShape }) {
-  return createMiddleware({ gate: gateFromConfigFn(wiki.gate) });
+export function createMiddlewareFromConfig(wiki: { gate?: WikiGateConfigShape; analytics?: AnalyticsOption }) {
+  return createMiddleware({ gate: gateFromConfigFn(wiki.gate), analytics: wiki.analytics });
 }

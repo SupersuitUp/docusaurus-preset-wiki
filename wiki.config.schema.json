@@ -138,6 +138,23 @@
         }
       }
     },
+    "analytics": {
+      "description": "Reader analytics: who reads which page, told from the edge (src/analytics/reads.ts). Absent or true: a freedom-account wiki reports to its own portal (<origin of gate.signInUrl>/api/wiki-reads), any other wiki sends nothing unless WIKI_ANALYTICS_URL is set. false: nothing is ever sent. An object names the sink. Events carry the page, the reader the signed grant names (or key, password, anonymous, share), country and mobile/desktop; never an IP or a raw user agent.",
+      "oneOf": [
+        { "type": "boolean" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "format": "uri",
+              "description": "Where signed events are POSTed (header x-wiki-read-sig). WIKI_ANALYTICS_URL on the project overrides it."
+            }
+          }
+        }
+      ]
+    },
     "hero_register": {
       "type": "object",
       "additionalProperties": false,

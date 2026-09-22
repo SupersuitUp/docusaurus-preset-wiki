@@ -5,6 +5,17 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.9.0 (2026-09-21)
+
+**Reader analytics: who actually reads a gated wiki.** Gary, 2026-09-21: "I want analytics on who's actually reading our wikis ... a really great default thing that we can instrument into our Docusaurus template on NPM." Design: `projects/2026-09-13-wiki-framework-as-a-package/documents/2026-09-21-205834-wiki-reader-analytics-design.md` in the workspace.
+
+- **A client module** (`src/analytics/client.ts`, registered by the theme's `getClientModules`) beacons `{path, title, ref}` to `/_wiki/read` on every route, `ref` on the first only, with `sendBeacon` (fetch `keepalive` as the fallback). Skipped under `navigator.webdriver`, on localhost, at SSR, and on a same-page hash or query change.
+- **The middleware names the reader, never the browser.** `/_wiki/read` runs right after the bot block and is always `204`. The reader is the gate's verdict on the same cookies presented as a GET, so the password gate never parses a beacon as its form. `GateVerdict` gains `reader?`: the account gate sets the grant's uid (`key` for an hourly-key grant), the password gate sets `password`. Door knocks (a 401 HTML refusal of a GET, prefetches excluded) and served share mirrors are logged too, as `kind: "door"` and `kind: "share"`. Unfurl bots are never counted.
+- **The event and its signature** are fixed by the design doc so the portal receiver can be built against it: `{ v: 1, kind, host, path, title?, ref?, reader, at, country?, device }`, posted with `x-wiki-read-sig` = first 32 hex of HMAC-SHA256(pass secret, `wiki-read:v1:` + body). No IP, no User-Agent, and `ref` is cut to origin + path so a credential in a referring query string never leaves the edge. The test holds the signature to a node:crypto oracle.
+- **On by default only where it means something**: a `freedom-account` gate reports to `<origin of signInUrl>/api/wiki-reads` (exposed as the gate's `readSink`); `analytics: { endpoint }` in wiki.config.json (new, in the schema) or `WIKI_ANALYTICS_URL` names another; `analytics: false` turns it off; an open wiki with no endpoint sends nothing. `createMiddlewareFromConfig` reads the block.
+- **The middleware takes Vercel's `(request, context)`** and hands each send to `context.waitUntil`, else awaits it for at most 800 ms. A sink failure never changes a response.
+- `src/analytics/reads.ts` imports nothing from the rest of the package, so a wiki not yet on it can mirror the one file (getfreedom-wiki does).
+
 ## 1.8.2 (2026-09-20)
 
 - `wiki upgrade` re-reads package.json after the package manager has written the new specifier before it adds `prepare`. 1.8.1 wrote the object it had read BEFORE the install back over the file, so the dependency line went back to its old range while the lockfile carried the new one, and all 17 wikis upgraded that evening failed their Vercel install with `ERR_PNPM_OUTDATED_LOCKFILE` (repaired by hand, one commit each). `addPrepareToPackageJson` is the tested piece.

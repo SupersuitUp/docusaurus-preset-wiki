@@ -69,7 +69,8 @@ and an instance's own `src/theme/` still shadows both.
 | share-view plugin | post-build: a chrome-less, scriptless mirror of every page under `share-view/`, served by the middleware at `/s/<sig>/<route>` |
 | theme | `DocItem/Content` (ejected from theme-classic: the meta row of dates + share button rendered server-side under the H1, so the static HTML and the share mirror carry it), `DocMetaRow`, `MDXComponents/Heading` (puts the row after a markdown `# Title`), `MDXComponents/A` (external links open in a new tab), `ShareButton`, `PageDates`, `Changelog`, `ChangelogWidget`, and `wiki.css` (layout, typography, components; reads the instance's tokens) |
 | `defineWikiConfig(wiki, overrides?)` | the whole Docusaurus `Config` from `wiki.config.json`: head tags for icons and manifest, robots meta and sitemap from `noindex`, classic preset options including the index-stripping sidebar generator, `themeConfig` metadata, navbar, footer, prism, colour mode |
-| `./middleware` | `createMiddleware({ gate?, secret? })`, `UNFURL_BOT_PATTERN`, `BLOCKED_BOT_PATTERN`, `MATCHER`, `config`, `handleShare`; edge-safe, no Node built-ins |
+| `./middleware` | `createMiddleware({ gate?, secret?, analytics? })`, `createMiddlewareFromConfig(wiki)`, `UNFURL_BOT_PATTERN`, `BLOCKED_BOT_PATTERN`, `MATCHER`, `config`, `handleShare`, the `/_wiki/read` handler; edge-safe, no Node built-ins |
+| reader analytics | a client module that beacons each page a reader opens to `/_wiki/read`; the middleware names the reader from the signed gate cookie and forwards a signed event, plus door knocks and share-mirror reads. On by default for a `freedom-account` wiki, silent on an open one. See [Reader analytics](#reader-analytics) |
 | `wiki` CLI | `wiki check` (owned-files, middleware, admonitions, llms, links, image-weight, provenance), `wiki migrate` (a v1.x copy onto the package), `wiki upgrade` (to the newest release, with the CHANGELOG between), `wiki refresh-dates` (rewrite and stage the page-dates snapshot; `--check`), `wiki install-hooks` (the pre-commit hook that runs it), `wiki gate set\|status\|link` (the deployed gate, through the Vercel API with read-back, redeploy and live checks), `wiki share`, `wiki hero` (render a page's hero through the wiki's Style Pack, read it back, publish it), `wiki icons`, `wiki optimize-images` |
 
 ## Per-wiki additions
@@ -170,6 +171,41 @@ export default createMiddleware({ gate });
 Unfurl bots (iMessage, Slack, X, ...) pass the block and the gate but still meet the share layer,
 so a shared link previews. The share secret is `WIKI_SHARE_SECRET`, then `WIKI_GATE_SECRET`;
 rotating it revokes every share link at once.
+
+## Reader analytics
+
+**Who reads which page, on a gated wiki, told from the edge.** Docusaurus is an SPA, so after the
+first load no navigation reaches the middleware. The theme ships a client module that, on every
+route (the first included), sends `POST /_wiki/read {path, title, ref}` with `navigator.sendBeacon`.
+That is all the browser says. The middleware answers it `204` whatever happens, works out WHO it is
+from the gate's verdict on the signed cookie (the grant's account id, `key` for a grant the hourly
+key bought, `password` on a password wiki, else `anonymous`), and forwards one event to the sink.
+It also logs the two things a beacon cannot see: a knock on the door (`kind: "door"`, the 401 card
+runs no script) and a served share mirror (`kind: "share"`, `reader: "share"`).
+
+**What is sent**, as JSON: `{ v: 1, kind, host, path, title?, ref?, reader, at, country?, device }`,
+where `country` is Vercel's `x-vercel-ip-country` and `device` is `mobile` or `desktop`.
+**What is not**: no IP, no User-Agent, no cookie is set, no third-party script, and `ref` is cut to
+origin and path so a `?pass=` or `?k=` in a referring URL never leaves the edge. The beacon is
+skipped under automation (`navigator.webdriver`) and on localhost; prefetches and unfurl bots are
+never counted.
+
+**Where it goes.** `POST <endpoint>` with `x-wiki-read-sig`: the first 32 hex of
+HMAC-SHA256(secret, `wiki-read:v1:` + body), the secret being the gate's pass secret
+(`WIKI_PASS_SECRET`, then `WIKI_GATE_SECRET`), so nothing new is minted. The endpoint:
+
+| Wiki | Sink |
+|---|---|
+| `gate.type: "freedom-account"` | `<origin of signInUrl>/api/wiki-reads`, the portal that signs its passes, with no config |
+| `"analytics": { "endpoint": "https://..." }` in wiki.config.json | that endpoint |
+| `WIKI_ANALYTICS_URL` on the project | that endpoint, over both of the above |
+| `"analytics": false` | nothing, ever |
+| an open wiki with none of these | nothing: the public package never phones home for a stranger |
+
+A deployment with no secret sends nothing. A sink that is down never changes a response: the send
+goes to `context.waitUntil` when Vercel passes one, else is awaited for at most 800 ms, and every
+failure is swallowed. `/_wiki/read` has no extension, so the family matcher already sends it to the
+middleware.
 
 ## A page's hero
 

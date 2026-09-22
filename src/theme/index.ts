@@ -15,7 +15,9 @@ export default function wikiTheme(_context: LoadContext): Plugin<void> {
       return path.resolve(__dirname, '../../src/theme');
     },
     getClientModules() {
-      return [path.resolve(__dirname, './wiki.css')];
+      // The reader-analytics beacon (src/analytics/client.ts) lives OUTSIDE the theme path, so it
+      // never becomes an `@theme/` component a site could accidentally swizzle over.
+      return [path.resolve(__dirname, './wiki.css'), path.resolve(__dirname, '../analytics/client.js')];
     },
   };
 }

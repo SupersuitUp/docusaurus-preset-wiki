@@ -5,6 +5,10 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.10.1
+
+- `wiki gate set` no longer mints or rotates `WIKI_GATE_SECRET` on a `freedom-account` wiki. The hourly `?k=` key is derived by the portal from ITS secret, so a wiki-local one meant every key link met the door (supersuit.wiki, found 2026-09-21 by the first named-key read). New `--key-secret "<portal's WIKI_GATE_SECRET>"` sets it; without it the command says the key links open the wiki only if the value already matches.
+
 ## 1.10.0 (2026-09-21)
 
 **The hourly key can say who it was issued to.** 1.9.0 logged every reader who came in on the portal's `?k=` link as `reader: "key"`, because the bare key proves an account asked this hour and not which one (the gap named in the reader-analytics design doc).

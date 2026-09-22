@@ -31,9 +31,11 @@ import { pathToFileURL } from "node:url";
 const HELP = `wiki gate <set|status|link>
 
   set --password "<word>"     set or rotate the password; mints WIKI_GATE_SECRET and WIKI_SHARE_SECRET on first use
-  set --type freedom-account --pass-secret "<value>"
+  set --type freedom-account --pass-secret "<value>" --key-secret "<value>"
                               the door for people running Freedom (gate.type in wiki.config.json). The pass
-                              secret must be the portal's; WIKI_PASSWORD is removed, since it would open nothing
+                              secret must be the portal's; WIKI_PASSWORD is removed, since it would open nothing.
+                              --key-secret is the portal's WIKI_GATE_SECRET, which the hourly ?k= key is derived
+                              from; it is never minted here, because a wiki-local one opens nothing
   set --type password --password "<word>"   back to the password door
   set --rotate-secrets        new secrets: every ticket and every share link ever issued stops working
   status [--password "<word>"]  what the live site does: door, preloaded link, ticket, bots, og card, manifest.
@@ -111,12 +113,21 @@ export function writeGateType(root, type) {
 /** The env variables the gate needs, given what is already set. Pure, so it is testable.
  *  `type` "freedom-account" drops WIKI_PASSWORD (it would open nothing and reads as a lock in the
  *  dashboard), sets WIKI_PASS_SECRET when one is given, and mints the two family secrets. */
-export function planEnv(existing, { password, type, passSecret, rotateSecrets = false, random = () => randomBytes(32).toString("hex") }) {
+export function planEnv(existing, { password, type, passSecret, keySecret, rotateSecrets = false, random = () => randomBytes(32).toString("hex") }) {
   const plan = [];
   const have = (k) => existing.find((e) => e.key === k);
   if (type === "freedom-account") {
     if (have("WIKI_PASSWORD")) plan.push({ key: "WIKI_PASSWORD", value: "", action: "delete" });
     if (passSecret !== undefined) plan.push({ key: "WIKI_PASS_SECRET", value: passSecret, action: have("WIKI_PASS_SECRET") ? "update" : "create" });
+    // THE HOURLY KEY IS THE PORTAL'S, never the wiki's. The portal derives `?k=` from ITS
+    // WIKI_GATE_SECRET, so a secret minted here can never match and every key link meets the
+    // door. supersuit.wiki ran that way from its move onto this gate until 2026-09-21, found by
+    // the first named-key read. So: set it only from --key-secret, never mint or rotate it.
+    if (keySecret !== undefined) plan.push({ key: "WIKI_GATE_SECRET", value: keySecret, action: have("WIKI_GATE_SECRET") ? "update" : "create" });
+    const cur = have("WIKI_SHARE_SECRET");
+    if (!cur) plan.push({ key: "WIKI_SHARE_SECRET", value: random(), action: "create" });
+    else if (rotateSecrets) plan.push({ key: "WIKI_SHARE_SECRET", value: random(), action: "update" });
+    return plan;
   } else if (password !== undefined) {
     plan.push({ key: "WIKI_PASSWORD", value: password, action: have("WIKI_PASSWORD") ? "update" : "create" });
   }
@@ -333,16 +344,18 @@ async function main() {
     const rotate = has("--rotate-secrets");
     const type = flag("--type");
     const passSecret = flag("--pass-secret");
+    const keySecret = flag("--key-secret");
+    if (keySecret !== undefined && keySecret.length < 32) { console.error("[gate] --key-secret must be the portal's WIKI_GATE_SECRET, at least 32 characters"); return 2; }
     if (type !== undefined && !["password", "freedom-account"].includes(type)) { console.error(`[gate] --type must be password or freedom-account, got "${type}"`); return 2; }
     if (type === "freedom-account" && passSecret !== undefined && passSecret.length < 32) { console.error("[gate] --pass-secret must be the portal's own value, at least 32 characters; a short or invented one opens nothing"); return 2; }
-    if (password === undefined && !rotate && type === undefined) { console.error("[gate] set needs --password \"<word>\", --type <password|freedom-account>, and/or --rotate-secrets"); return 2; }
+    if (password === undefined && !rotate && type === undefined && keySecret === undefined) { console.error("[gate] set needs --password \"<word>\", --type <password|freedom-account>, and/or --rotate-secrets"); return 2; }
     if (password !== undefined && !password.trim()) { console.error("[gate] refusing an empty password; that is the blank-variable failure this command exists to prevent"); return 2; }
     const effectiveType = type ?? declaredType;
     if (type !== undefined && type !== declaredType) { writeGateType(ROOT, type); console.log(`[gate] wiki.config.json gate.type = ${type} (commit it; the edge reads the gate from the config)`); }
     const project = readProject();
     const token = readToken();
     const existing = await listEnv(token, project);
-    const plan = planEnv(existing, { password, type: effectiveType, passSecret, rotateSecrets: rotate });
+    const plan = planEnv(existing, { password, type: effectiveType, passSecret, keySecret, rotateSecrets: rotate });
     for (const s of plan) console.log(`[gate] ${s.action} ${s.key}${s.action === "delete" ? "" : ` (${s.value.length} chars)`}`);
     await applyPlan(token, project, plan, existing);
     const after = await readBack(token, project, ["WIKI_PASSWORD", "WIKI_PASS_SECRET", "WIKI_GATE_SECRET", "WIKI_SHARE_SECRET"]);
@@ -351,6 +364,9 @@ async function main() {
     console.log("[gate] read back: every variable has the length that was written");
     if (effectiveType === "freedom-account" && !after.find((e) => e.key === "WIKI_PASS_SECRET")?.value) {
       console.log("[gate] no WIKI_PASS_SECRET on the project: the gate will verify passes with WIKI_GATE_SECRET, which must then equal the portal's WIKI_GATE_SECRET");
+    }
+    if (effectiveType === "freedom-account" && keySecret === undefined) {
+      console.log("[gate] WIKI_GATE_SECRET was not set from --key-secret: the hourly ?k= links open this wiki only if it already equals the portal's");
     }
     await redeploy(token, project);
     if (effectiveType === "freedom-account") {

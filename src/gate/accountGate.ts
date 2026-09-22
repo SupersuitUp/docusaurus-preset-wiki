@@ -123,9 +123,21 @@ function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
+/** The uid a live grant names (`key` for one the hourly key bought), or null when there is none. */
+export async function grantReader(request: Request, secret: string, now = Date.now()): Promise<string | null> {
+  const ok = await verifyToken(readCookie(request, GRANT_COOKIE), secret, 'wiki-grant', Math.floor(now / 1000));
+  return ok ? ok.uid : null;
+}
+
 /** Does this request hold a live grant? Exported so a share layer can ask the same question. */
 export async function hasValidGrant(request: Request, secret: string, now = Date.now()): Promise<boolean> {
-  return (await verifyToken(readCookie(request, GRANT_COOKIE), secret, 'wiki-grant', Math.floor(now / 1000))) !== null;
+  return (await grantReader(request, secret, now)) !== null;
+}
+
+/** Where reader analytics go for a wiki behind this gate, with no config: the portal that signs
+ *  its passes, `<origin of signInUrl>/api/wiki-reads`. Null when signInUrl is not a URL. */
+export function readSinkFor(signInUrl: string = DEFAULT_SIGN_IN): string | null {
+  try { return new URL('/api/wiki-reads', signInUrl).toString(); } catch { return null; }
 }
 
 function escapeHtml(value: string): string {
@@ -203,7 +215,7 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
   const grantDays = opts.grantDays ?? DEFAULT_GRANT_DAYS;
   const openPaths = opts.openPaths ?? DEFAULT_OPEN_PATHS;
 
-  return async function accountGate(request: Request): Promise<GateVerdict> {
+  const gate: GateFn = async function accountGate(request: Request): Promise<GateVerdict> {
     const secret = opts.secret ?? process.env.WIKI_PASS_SECRET ?? process.env.WIKI_GATE_SECRET ?? '';
     const keySecret = opts.keySecret ?? process.env.WIKI_GATE_SECRET ?? secret;
     const url = new URL(request.url);
@@ -244,7 +256,8 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
       return redeem('key', KEY_PARAM);
     }
 
-    if (await hasValidGrant(request, secret, now)) return { authorized: true };
+    const reader = await grantReader(request, secret, now);
+    if (reader !== null) return { authorized: true, reader };
 
     // The door, carrying the page they asked for with any spent credential stripped off.
     const back = cleanUrl(PASS_PARAM);
@@ -256,4 +269,7 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
       response: htmlResponse(doorPage(opts.title ?? url.host, signInHref, { expired: passExpired, signedOut: justSignedOut(url) }), 401),
     };
   };
+  const sink = readSinkFor(signInUrl);
+  if (sink) gate.readSink = sink;
+  return gate;
 }

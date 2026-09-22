@@ -238,7 +238,8 @@ export function createPasswordGate(opts: PasswordGateOptions = {}): GateFn | und
       };
     }
 
-    if (await hasValidTicket(request, secret)) return { authorized: true };
+    // A shared word names nobody, so the reader is the word, never a guess at a person.
+    if (await hasValidTicket(request, secret)) return { authorized: true, reader: 'password' };
 
     const key = url.searchParams.get(unlockParam);
     if (key !== null && normalize(key) === normalize(password)) {
@@ -259,7 +260,7 @@ export function createPasswordGate(opts: PasswordGateOptions = {}): GateFn | und
       // This grants no access the redirect did not already grant: a caller holding the right
       // password could always reach the file in two requests with a jar. It removes the jar.
       if (MACHINE_PATH_PATTERN.test(url.pathname) || MACHINE_PREFIX_PATTERN.test(url.pathname)) {
-        return { authorized: true };
+        return { authorized: true, reader: 'password' };
       }
       const clean = new URL(url.toString());
       clean.searchParams.delete(unlockParam);

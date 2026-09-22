@@ -21,6 +21,8 @@ export interface WikiConfig {
     grantDays?: number;
     title?: string;
   };
+  /** Reader analytics (src/analytics/reads.ts). false turns it off; an object names the sink. */
+  analytics?: boolean | { endpoint?: string };
   og?: { bg?: string; accent?: string; text?: string; muted?: string };
   intake_mode?: 'source-grounded' | 'authored-canon';
   skill_prefix?: string;

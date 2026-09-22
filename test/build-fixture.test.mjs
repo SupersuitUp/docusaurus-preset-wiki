@@ -83,6 +83,9 @@ test('a fixture instance builds from the package and emits every framework outpu
   const cssText = css.map((f) => readFileSync(join(out, 'assets', 'css', f), 'utf8')).join('\n');
   assert.match(cssText, /doc-meta-slot|\.markdown h1\s*\+\s*p/, 'framework wiki.css bundled');
   assert.match(cssText, /--ifm-color-primary/, 'instance brand tokens bundled');
+  const js = readdirSync(join(out, 'assets', 'js')).filter((f) => f.endsWith('.js'));
+  const jsText = js.map((f) => readFileSync(join(out, 'assets', 'js', f), 'utf8')).join('\n');
+  assert.match(jsText, /\/_wiki\/read/, 'reader-analytics beacon bundled as a client module');
   // The minifier may keep `:is(h1, header, .doc-meta-slot) + p` or expand it per selector
   // (with `:not(.does-not-exist)` specificity padding), depending on the browserslist;
   // the `.doc-meta-slot + p` arm survives either way.

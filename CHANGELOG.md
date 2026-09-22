@@ -5,6 +5,14 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.10.0 (2026-09-21)
+
+**The hourly key can say who it was issued to.** 1.9.0 logged every reader who came in on the portal's `?k=` link as `reader: "key"`, because the bare key proves an account asked this hour and not which one (the gap named in the reader-analytics design doc).
+
+- The account gate accepts a NAMED key beside the bare one: `<uid>.<sig>`, uid matching the gate's UID rule, sig = first 32 hex of HMAC-SHA256(`WIKI_GATE_SECRET`, `wiki-gate:<hour>:<uid>`), valid this hour and the last. Its grant carries the uid, so `verdict.reader` and every analytics event it buys name the account. The bare key is unchanged and still grants `key`.
+- `namedHourKey(secret, at, uid)` is exported. The portal's `/api/wiki-key` returns it as `named` beside the unchanged `key`; the Freedom plugin prefers it, older plugins ignore it. The test holds it to a node:crypto oracle and to a fixed vector the portal's test shares.
+- A wrong uid, a forged or foreign-secret sig, a stale hour or a malformed value is the door with no cookie.
+
 ## 1.9.0 (2026-09-21)
 
 **Reader analytics: who actually reads a gated wiki.** Gary, 2026-09-21: "I want analytics on who's actually reading our wikis ... a really great default thing that we can instrument into our Docusaurus template on NPM." Design: `projects/2026-09-13-wiki-framework-as-a-package/documents/2026-09-21-205834-wiki-reader-analytics-design.md` in the workspace.

@@ -21,6 +21,12 @@
 // `/api/wiki-key`. That path is kept, byte for byte, so an operator already running Freedom
 // never meets the door. `keySecret` defaults to `WIKI_GATE_SECRET`, then the pass secret.
 //
+// THE KEY CAN NAME ITS HOLDER (1.10.0). A bare key (32 hex) proves an account asked this hour,
+// not which one, so its grant and every read it buys say `key`. A NAMED key, `<uid>.<sig>` with
+// sig = HMAC(`wiki-gate:<hour>:<uid>`), is what `/api/wiki-key` now hands back beside the bare one
+// as `named`: same secret, same two-hour window, but the grant carries the account id, so reader
+// analytics name the reader. Both shapes are accepted; old plugins keep sending the bare one.
+//
 // WHY THE SIGN-IN LIVES ON THE PORTAL AND NOT ON THE WIKI. The wiki is a static site behind an
 // edge function; the portal already has the Firebase project, the Google OAuth client, the
 // authorized domain, the entitlement check and the revocation path. Putting a second sign-in
@@ -80,6 +86,31 @@ async function hmacHex(secret: string, msg: string): Promise<string> {
 
 /** The portal's hourly key, derived identically in continental-works-web/src/app/api/wiki-key. */
 export const hourKey = (secret: string, at: number) => hmacHex(secret, `wiki-gate:${Math.floor(at / HOUR_MS)}`);
+
+/** The portal's NAMED hourly key, `<uid>.<sig>` with sig over `wiki-gate:<hour>:<uid>`. Its grant
+ *  carries `uid`, so reads it buys are named. Minted in continental-works-web's wiki-key route. */
+export async function namedHourKey(secret: string, at: number, uid: string): Promise<string> {
+  if (!UID.test(uid)) throw new Error(`namedHourKey: uid must match ${UID}`);
+  return `${uid}.${await hmacHex(secret, `wiki-gate:${Math.floor(at / HOUR_MS)}:${uid}`)}`;
+}
+
+/** The uid a `?k=` value buys: `key` for the bare hourly key, the named uid for `<uid>.<sig>`,
+ *  null when it is neither, this hour or the last. */
+async function keyHolder(k: string, secret: string, now: number): Promise<string | null> {
+  for (const at of [now, now - HOUR_MS]) {
+    if (/^[a-f0-9]{32}$/.test(k)) {
+      if (constantTimeEqual(k, await hourKey(secret, at))) return 'key';
+      continue;
+    }
+    const dot = k.indexOf('.');
+    if (dot === -1) return null;
+    const uid = k.slice(0, dot);
+    const sig = k.slice(dot + 1);
+    if (!UID.test(uid) || !/^[a-f0-9]{32}$/.test(sig)) return null;
+    if (constantTimeEqual(k, await namedHourKey(secret, at, uid))) return uid;
+  }
+  return null;
+}
 
 /** A pass: `v1.<uid>.<exp>.<sig>`, exp in unix seconds. Minted by the portal; exported for tests and tooling. */
 export async function mintPass(secret: string, uid: string, exp: number): Promise<string> {
@@ -252,8 +283,9 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
       passExpired = true;
     }
     const k = url.searchParams.get(KEY_PARAM);
-    if (k !== null && (constantTimeEqual(k, await hourKey(keySecret, now)) || constantTimeEqual(k, await hourKey(keySecret, now - HOUR_MS)))) {
-      return redeem('key', KEY_PARAM);
+    if (k !== null) {
+      const holder = await keyHolder(k, keySecret, now);
+      if (holder !== null) return redeem(holder, KEY_PARAM);
     }
 
     const reader = await grantReader(request, secret, now);

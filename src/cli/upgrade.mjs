@@ -12,6 +12,7 @@ import { join, dirname } from "node:path";
 import { spawnSync, execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ensurePrepare } from "./install-hooks.mjs";
+import { isDirectRun } from "./is-direct-run.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -84,4 +85,4 @@ export function upgrade() {
   return 0;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) process.exit(upgrade());
+if (isDirectRun(import.meta.url)) process.exit(upgrade());

@@ -5,6 +5,18 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.12.2 (2026-09-23)
+
+**Eleven CLIs, including five gates, did nothing and exited 0 when invoked through a symlink.** pnpm installs every package as a symlink into `.pnpm/`, so this was every consumer of this package.
+
+- Each CLI guarded its entry point by comparing `import.meta.url` to `process.argv[1]` by hand, in three different spellings. Through a symlink those are the link and the target, so the comparison is false: the file imports cleanly, runs nothing, and **exits 0, which reads as a pass**. Measured on the installed 1.12.1: `check-links`, `check-voice` and `check-page-graphics` each printed nothing at all when run by path out of `node_modules`. One spelling, `` `file://${process.argv[1]}` ``, additionally breaks on any path containing a space.
+- **No build was broken by this.** `wiki check`, which is what `prebuild` runs, spawns each gate by a resolved path and was always correct. The failure was for anyone running a gate directly, who got silence and a zero exit and had every reason to read it as clean. That is the "declared gate that never runs" failure this package's own `check-links` header was written about, arriving in the guard rather than in the gate.
+- `src/cli/is-direct-run.mjs` is now the single `isDirectRun(import.meta.url)`, resolving both sides through `realpath`. All eleven delegate to it.
+- **`is-direct-run.test.mjs` refuses a twelfth copy.** It greps `src/cli` for the three hand-rolled spellings and fails naming the offenders, because a header telling the next author to use the helper changes nothing about what the next author types. Verified to fail when one is reintroduced.
+- **DETECTOR:** run any gate by path out of an installed `node_modules` (`node node_modules/@supersuit/docusaurus-preset-wiki/lib/cli/check-voice.mjs .`). Silence and exit 0 is the defect; every gate prints a line even when it finds nothing.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`. No wiki content changes.
+- 6 new tests: symlinked and spaced paths, imported-vs-run through spawned fixtures, both symlink regressions in `check-links.test.mjs`, and the anti-duplication assertion. All verified to fail without the fix.
+
 ## 1.12.1 (2026-09-23)
 
 **The same defect was in four places, not two.** 1.12.0 fixed the link gate and the changelog plugin. Sweeping for other copies of "derives a doc URL from the `docs/` tree without applying `routeBasePath`" found two more, both shipping 404s on any wiki whose docs are not at the root.

@@ -28,6 +28,7 @@
 //   node scripts/check-ascii-diagrams.mjs --json   # machine-readable
 import {readFileSync, readdirSync, statSync} from 'fs';
 import {join, relative, resolve} from 'path';
+import { isDirectRun } from "./is-direct-run.mjs";
 
 // Languages that carry no syntax and so cannot vouch for a fence being real code.
 const DECORATIVE_LANGS = new Set(['', 'text', 'txt', 'plain', 'plaintext', 'none', 'ascii']);
@@ -155,4 +156,4 @@ is for, and it is what this gate reads first.
   process.exit(1);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (isDirectRun(import.meta.url)) main();

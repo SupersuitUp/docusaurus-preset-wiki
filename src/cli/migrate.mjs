@@ -33,6 +33,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { ensurePrepare } from "./install-hooks.mjs";
+import { isDirectRun } from "./is-direct-run.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.cwd();
@@ -293,4 +294,4 @@ export function migrate() {
   return warnings.length ? 3 : 0;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) process.exit(migrate());
+if (isDirectRun(import.meta.url)) process.exit(migrate());

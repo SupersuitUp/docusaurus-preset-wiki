@@ -17,7 +17,8 @@
 // the links itself.
 import { readFileSync, existsSync, readdirSync, statSync } from "fs";
 import { join, resolve, dirname, relative } from "path";
-import { pathToFileURL } from "url";
+import { pathToFileURL, fileURLToPath } from "url";
+import { isDirectRun } from "./is-direct-run.mjs";
 
 
 // THE DOCS ARE NOT ALWAYS AT THE ROOT, AND ASSUMING THEY ARE INVERTS THIS GATE.
@@ -148,4 +149,4 @@ export function main(argv = process.argv.slice(2)) {
 
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (isDirectRun(import.meta.url)) main();

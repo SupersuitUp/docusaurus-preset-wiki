@@ -21,6 +21,7 @@ import { randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDirectRun } from "./is-direct-run.mjs";
 
 // The wiki root is the cwd `wiki share` runs in, never this file's location: the file ships
 // inside node_modules.
@@ -215,7 +216,7 @@ export function decide(pageUrl, { param, password, share = null }, probes) {
 }
 
 const invokedDirectly =
-  process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+  isDirectRun(import.meta.url);
 
 if (invokedDirectly) {
   const args = process.argv.slice(2);

@@ -15,6 +15,7 @@
 import {existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {join, relative, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import { isDirectRun } from "./is-direct-run.mjs";
 
 const SCAN_DIRS = ['docs', 'plain', 'src/data', 'static/og-deck'];
 const EXT = /\.(mdx?|mjs|js|ts|tsx|json|html|txt)$/;
@@ -114,4 +115,4 @@ export function main(root = process.cwd()) {
   return 1;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) process.exit(main());
+if (isDirectRun(import.meta.url)) process.exit(main());

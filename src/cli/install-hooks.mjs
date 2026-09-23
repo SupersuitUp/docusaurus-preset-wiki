@@ -13,6 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { isDirectRun } from "./is-direct-run.mjs";
 
 export const BEGIN = '# >>> @supersuit/docusaurus-preset-wiki refresh-dates >>>';
 export const END = '# <<< @supersuit/docusaurus-preset-wiki refresh-dates <<<';
@@ -82,7 +83,7 @@ export function installHooks({ root = process.cwd(), log = console.log } = {}) {
   return 0;
 }
 
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const isMain = isDirectRun(import.meta.url);
 if (isMain) {
   if (process.argv.includes('--print')) {
     console.log(hookBlock());

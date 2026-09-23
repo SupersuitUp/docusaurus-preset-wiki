@@ -30,6 +30,7 @@
 //   node scripts/check-page-graphics.mjs --json   # machine-readable
 import {readFileSync, writeFileSync, readdirSync, statSync, existsSync} from 'fs';
 import {join, relative, resolve} from 'path';
+import { isDirectRun } from "./is-direct-run.mjs";
 
 // The three the diagram kit's README names. A lookup page has no argument to draw.
 export const DEFAULT_EXEMPT = ['/reference/glossary', '/reference/voice-rules', '/changelog',
@@ -162,7 +163,7 @@ function collect(dir, root, out = []) {
   return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectRun(import.meta.url)) {
   const json = process.argv.includes('--json');
   const docs = resolve(process.cwd(), 'docs');
   if (!existsSync(docs)) { console.log('[page-graphics] no docs/ here; nothing to check'); process.exit(0); }

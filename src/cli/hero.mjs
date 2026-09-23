@@ -28,6 +28,7 @@ import { compileHero } from '../hero/compile.mjs';
 import { resolveAdapter, renderHero } from '../hero/render.mjs';
 import { readBack, counterClauses, DEFAULT_VISION_MODEL } from '../hero/readback.mjs';
 import { publishHero } from '../hero/publish.mjs';
+import { isDirectRun } from "./is-direct-run.mjs";
 
 /** The most renders one hero gets. The first plus two re-rolls; each round is a paid render. */
 export const MAX_ROUNDS = 3;
@@ -311,5 +312,5 @@ export async function main(argv = process.argv.slice(2), root = process.cwd(), d
   return 0;
 }
 
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const isMain = isDirectRun(import.meta.url);
 if (isMain) main().then((code) => process.exit(code), (err) => { console.error(`[hero] ${err.message}`); process.exit(1); });

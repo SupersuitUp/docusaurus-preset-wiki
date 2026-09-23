@@ -16,6 +16,7 @@ import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isDirectRun } from "./is-direct-run.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -60,7 +61,7 @@ export function refreshDates({ root = process.cwd(), stage = true, check = false
   return 0;
 }
 
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const isMain = isDirectRun(import.meta.url);
 if (isMain) {
   const args = process.argv.slice(2);
   process.exit(refreshDates({ stage: !args.includes('--no-stage'), check: args.includes('--check') }));

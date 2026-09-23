@@ -26,6 +26,7 @@
 //   node scripts/check-voice.mjs --json   # machine-readable
 import {readFileSync, readdirSync, statSync, existsSync} from 'fs';
 import {join, relative, resolve} from 'path';
+import { isDirectRun } from "./is-direct-run.mjs";
 
 export const DEFAULT_RULES = [
   {
@@ -94,7 +95,7 @@ function collect(dir, out = []) {
   return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectRun(import.meta.url)) {
   const json = process.argv.includes('--json');
   const docs = resolve(process.cwd(), 'docs');
   if (!existsSync(docs)) { console.log('[voice] no docs/ here; nothing to check'); process.exit(0); }

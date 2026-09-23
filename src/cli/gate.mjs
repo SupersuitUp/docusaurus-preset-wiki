@@ -27,6 +27,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes, createHmac } from "node:crypto";
 import { pathToFileURL } from "node:url";
+import { isDirectRun } from "./is-direct-run.mjs";
 
 const HELP = `wiki gate <set|status|link>
 
@@ -392,5 +393,5 @@ async function main() {
   return 2;
 }
 
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const isMain = isDirectRun(import.meta.url);
 if (isMain) main().then((code) => process.exit(code), (err) => { console.error(`[gate] ${err.message}`); process.exit(1); });

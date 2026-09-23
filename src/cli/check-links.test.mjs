@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -91,4 +91,40 @@ test("with no base, an unprefixed link still passes", () => {
   });
   assert.equal(run(d).code, 0);
   rmSync(d, { recursive: true, force: true });
+});
+
+// THE SILENT NO-OP. pnpm installs packages as symlinks, so process.argv[1] is the link and
+// import.meta.url is the target. A naive direct-run guard is false for every pnpm consumer:
+// the gate runs nothing and exits 0, which reads as a pass.
+test("invoked through a SYMLINK, the gate still runs", () => {
+  const d = wiki(null, {
+    "concepts/x.md": "---\nslug: /concepts/x\n---\nbody",
+    "a.md": "see [x](/concepts/x)",
+  });
+  const linkDir = mkdtempSync(join(tmpdir(), "check-links-link-"));
+  const link = join(linkDir, "check-links.mjs");
+  symlinkSync(CLI, link);
+  const r = (() => {
+    try { return { code: 0, out: execFileSync(process.execPath, [link, d], { encoding: "utf8" }) }; }
+    catch (e) { return { code: e.status, out: (e.stdout || "") + (e.stderr || "") }; }
+  })();
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /check-links: \d+ files/,
+    "a symlinked invocation must produce the report, not silence");
+  rmSync(d, { recursive: true, force: true });
+  rmSync(linkDir, { recursive: true, force: true });
+});
+
+test("invoked through a SYMLINK, a broken link still fails", () => {
+  const d = wiki(null, { "a.md": "see [x](/concepts/nope)" });
+  const linkDir = mkdtempSync(join(tmpdir(), "check-links-link-"));
+  const link = join(linkDir, "check-links.mjs");
+  symlinkSync(CLI, link);
+  let code = 0, out = "";
+  try { out = execFileSync(process.execPath, [link, d], { encoding: "utf8" }); }
+  catch (e) { code = e.status; out = (e.stdout || "") + (e.stderr || ""); }
+  assert.equal(code, 1, "silence and exit 0 through a symlink is the defect");
+  assert.match(out, /\/concepts\/nope/);
+  rmSync(d, { recursive: true, force: true });
+  rmSync(linkDir, { recursive: true, force: true });
 });

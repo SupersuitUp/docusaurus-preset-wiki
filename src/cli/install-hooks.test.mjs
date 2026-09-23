@@ -76,3 +76,42 @@ test('outside git it says so and exits 0, so an install never fails on it', () =
   assert.equal(installHooks({ root, log: (m) => logs.push(m) }), 0);
   assert.match(logs[0], /not a git checkout/);
 });
+
+// The merge half: two branches that each regenerated the snapshot merge without a conflict.
+import { spawnSync } from 'node:child_process';
+import { installMergeDriver } from './install-hooks.mjs';
+
+function snapRepo() {
+  const r = mkdtempSync(join(tmpdir(), 'snapmerge-'));
+  const g = (...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: r, encoding: 'utf8' });
+  g('init', '-q', '-b', 'main');
+  mkdirSync(join(r, 'src/data'), { recursive: true });
+  writeFileSync(join(r, 'src/data/changelog-events.json'), '{"e":[1]}\n'); writeFileSync(join(r, 'page.md'), 'a\n');
+  g('add', '.'); g('commit', '-qm', 'base');
+  g('checkout', '-qb', 'side'); writeFileSync(join(r, 'src/data/changelog-events.json'), '{"e":[1,2]}\n'); g('commit', '-qam', 's');
+  g('checkout', '-q', 'main'); writeFileSync(join(r, 'src/data/changelog-events.json'), '{"e":[1,3]}\n'); g('commit', '-qam', 'm');
+  return { r, g };
+}
+const merge = (r) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'merge', '-q', '--no-edit', 'side'], { cwd: r, encoding: 'utf8' });
+
+test('without the driver two regenerated snapshots conflict', () => {
+  assert.notEqual(merge(snapRepo().r).status, 0);
+});
+
+test('with the driver they merge, ours kept, and no tracked file changes', () => {
+  const { r, g } = snapRepo();
+  assert.ok(installMergeDriver(r));
+  assert.equal(g('status', '--porcelain'), '', 'installing must not dirty the wiki');
+  assert.equal(merge(r).status, 0);
+  assert.equal(readFileSync(join(r, 'src/data/changelog-events.json'), 'utf8'), '{"e":[1,3]}\n');
+  installMergeDriver(r);
+  assert.equal(readFileSync(join(r, '.git/info/attributes'), 'utf8').split('changelog-snapshot').length, 2, 'idempotent');
+});
+
+test('a real page conflict still stops the merge', () => {
+  const { r, g } = snapRepo();
+  installMergeDriver(r);
+  g('checkout', '-q', 'side'); writeFileSync(join(r, 'page.md'), 's\n'); g('commit', '-qam', 'p');
+  g('checkout', '-q', 'main'); writeFileSync(join(r, 'page.md'), 'm\n'); g('commit', '-qam', 'p');
+  assert.notEqual(merge(r).status, 0);
+});

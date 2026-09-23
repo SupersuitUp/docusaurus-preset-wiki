@@ -57,6 +57,33 @@ function git(args, cwd) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 }
 
+// THE MERGE HALF. Every branch regenerates the snapshot from its own history, so any two branches
+// that each committed a page conflict on it, and that conflict blocks landing real work behind a
+// generated file (five times in one afternoon in getfreedom-wiki, 2026-09-23). Either side is a
+// correct snapshot one commit behind, which the file already promises, and the next commit's hook
+// refreshes it. So the clone gets a merge driver that keeps our side, and the attribute naming it
+// goes in the clone's own info/attributes, never in a tracked file: installing must not dirty the
+// wiki's tree. A clone that never ran this merges the file as text, exactly as before.
+export const MERGE_DRIVER = 'changelog-snapshot';
+export const SNAPSHOT = 'src/data/changelog-events.json';
+
+/** Register the driver and the attribute for `<prefix>src/data/changelog-events.json`. True when both are set. */
+export function installMergeDriver(root, prefix = '', run = git) {
+  try {
+    run(['config', `merge.${MERGE_DRIVER}.name`, 'keep ours: the snapshot is regenerated from history by the next commit'], root);
+    run(['config', `merge.${MERGE_DRIVER}.driver`, 'true'], root);
+    const raw = run(['rev-parse', '--git-path', 'info/attributes'], root);
+    const file = isAbsolute(raw) ? raw : resolve(root, raw);
+    const line = `/${prefix}${SNAPSHOT} merge=${MERGE_DRIVER}`;
+    const existing = existsSync(file) ? readFileSync(file, 'utf8') : '';
+    if (!existing.split('\n').includes(line)) {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, `${existing.replace(/\s*$/, '')}${existing.trim() ? '\n' : ''}${line}\n`);
+    }
+    return true;
+  } catch { return false; }
+}
+
 export function installHooks({ root = process.cwd(), log = console.log } = {}) {
   let hooksDir;
   let prefix;
@@ -69,6 +96,7 @@ export function installHooks({ root = process.cwd(), log = console.log } = {}) {
     log('[install-hooks] not a git checkout; nothing to install');
     return 0;
   }
+  installMergeDriver(root, prefix);
   const file = join(hooksDir, 'pre-commit');
   const existing = existsSync(file) ? readFileSync(file, 'utf8') : '';
   const next = mergeHook(existing, hookBlock(prefix));

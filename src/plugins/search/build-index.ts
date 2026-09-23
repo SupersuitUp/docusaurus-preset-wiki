@@ -4,6 +4,7 @@ import { glob } from 'glob';
 import matter from 'gray-matter';
 import { remark } from 'remark';
 import strip from 'strip-markdown';
+import { withBaseRoute } from '../../route-base';
 
 export type SearchEntry = {
   id: number;
@@ -18,6 +19,7 @@ const CONTENT_CHAR_CAP = 2000;
 
 export async function buildSearchIndex(
   docsDir: string,
+  docsBase = '',
 ): Promise<SearchEntry[]> {
   const files = await glob('**/*.{md,mdx}', { cwd: docsDir, posix: true });
   files.sort();
@@ -38,7 +40,7 @@ export async function buildSearchIndex(
     );
     const headings = extractHeadings(body);
     const section = sectionFromPath(relPath);
-    const docPath = computePath(relPath, frontmatter);
+    const docPath = withBaseRoute(computePath(relPath, frontmatter), docsBase);
     const content = await stripToText(body);
 
     entries.push({
@@ -86,6 +88,10 @@ function sectionFromPath(relPath: string): string {
   return norm.split('/')[0];
 }
 
+// DOCS-RELATIVE, always. The caller applies the docs routeBasePath, because a slug in
+// frontmatter is itself resolved by Docusaurus relative to that base, so this function and the
+// frontmatter agree with each other and neither knows where the docs are mounted. Returning an
+// already-prefixed path here would double-prefix a slug. See src/route-base.ts.
 function computePath(
   relPath: string,
   frontmatter: Record<string, unknown>,

@@ -5,6 +5,18 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.12.1 (2026-09-23)
+
+**The same defect was in four places, not two.** 1.12.0 fixed the link gate and the changelog plugin. Sweeping for other copies of "derives a doc URL from the `docs/` tree without applying `routeBasePath`" found two more, both shipping 404s on any wiki whose docs are not at the root.
+
+- **Search results.** `buildSearchIndex` built every entry's `path` from the file path or the frontmatter slug with no base, so on a moved wiki **every search hit was a 404**. The plugin now passes the base in.
+- **`llms.txt` and `llms-full.txt`.** Every URL in the agent-facing index was built as `$BASE_URL/$url_path` straight off the docs tree, so the whole index pointed at 404s. On an edge knowledge wiki, whose first reader is an agent, this was the worst of the four. The base is folded into `BASE_URL` in the bridge rather than threaded through the shell script.
+- **One reader per input, and a test that they agree.** `src/route-base.ts` (from `siteConfig`, for plugins) and `src/cli/docs-base.mjs` (from the config file, for CLI gates that run before Docusaurus). Two exist because the inputs genuinely differ; `src/route-base.test.mjs` holds them to identical answers on identical inputs, so a fix cannot land in one and not the other. The changelog plugin, the search plugin and `check-links` all now delegate rather than carry their own copy.
+- **The contract is `''` for a root-mounted wiki**, so the base composes by concatenation and every caller's falsy check means the same thing. A caller still passing `'/'` is accepted and treated as no base, so it cannot double-prefix.
+- **DETECTOR:** on a wiki with a non-root `routeBasePath`, open `llms.txt` and follow any URL, and run a search and follow any hit. A 404 from either is this defect. Both are invisible from the build, which reports success.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`, rebuild, redeploy. Root-mounted wikis are unaffected: every path normalizes to the previous behaviour.
+- 14 new tests (4 search, 5 cross-reader agreement, plus the 1.12.0 suites now covering the shared module). The search tests were verified to FAIL without the fix: 3 of 4 bite.
+
 ## 1.12.0 (2026-09-23)
 
 **Both link gates now know where the docs actually live.** A wiki that moves its docs so a homepage can own `/` (`routeBasePath: '/wiki'`) was served two independent, silent 404 factories, and together they held a production deploy at an hour stale while every local check read green.

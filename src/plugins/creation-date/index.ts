@@ -1,6 +1,7 @@
 import type { Plugin, LoadContext, PluginOptions } from '@docusaurus/types';
 import type { ChangeEvent, PageDates } from './collect';
 import { loadHistory, undatedPages, SNAPSHOT_RELATIVE_PATH } from './snapshot';
+import { docsRouteBasePath as resolveDocsBase, withBase as moveUnderBase } from '../../route-base';
 
 export interface CreationDatePluginContent {
   /** The changelog stream: newest first, meta pages excluded. */
@@ -12,23 +13,7 @@ export interface CreationDatePluginContent {
 // Git history in, two things out: the event stream /changelog renders and the
 // per-page dates every article shows under its title. How the snapshot keeps
 // production honest on Vercel's shallow clone is explained in snapshot.ts.
-/** The docs plugin's `routeBasePath`, or `/` when it is not set. */
-export function docsRouteBasePath(context: LoadContext): string {
-  const presets = (context.siteConfig as any)?.presets ?? [];
-  for (const preset of presets) {
-    if (!Array.isArray(preset)) continue;
-    const base = preset[1]?.docs?.routeBasePath;
-    if (typeof base === 'string' && base !== '/') return `/${base.replace(/^\/+|\/+$/g, '')}`;
-  }
-  return '/';
-}
-
-/** One change event with its routePath moved under the docs base path. */
-export function withBase<T extends {routePath?: string}>(event: T, base: string): T {
-  if (base === '/' || !event.routePath || !event.routePath.startsWith('/')) return event;
-  if (event.routePath === base || event.routePath.startsWith(`${base}/`)) return event;
-  return {...event, routePath: `${base}${event.routePath}`};
-}
+export { docsRouteBasePath, withBase } from '../../route-base';
 
 export default function creationDatePlugin(
   context: LoadContext,
@@ -47,7 +32,7 @@ export default function creationDatePlugin(
       // Found 2026-09-22 on the first wiki in the family to put something other than the docs at
       // `/`: every internal check passed (check-links resolves against slugs, which were right)
       // and only Docusaurus' own onBrokenLinks caught it, on the changelog alone.
-      const docsBase = docsRouteBasePath(context);
+      const docsBase = resolveDocsBase(context);
       const history = loadHistory(context.siteDir);
       if (history.wroteSnapshot) {
         console.log(
@@ -65,7 +50,7 @@ export default function creationDatePlugin(
         }
       }
       return {
-        changeEvents: history.changeEvents.map((e) => withBase(e, docsBase)),
+        changeEvents: history.changeEvents.map((e) => moveUnderBase(e, docsBase)),
         pageDates: history.pageDates,
       };
     },

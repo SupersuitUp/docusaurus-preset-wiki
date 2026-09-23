@@ -12,10 +12,13 @@ import {docsRouteBasePath, withBase} from './index.js';
 
 const ctx = (base) => ({siteConfig: {presets: [['classic', {docs: {routeBasePath: base}}]]}});
 
+// The contract is "" for a root-mounted wiki, so the base composes by plain concatenation
+// and every caller's falsy check means the same thing. '/' is still accepted from a caller
+// and treated as no base, so a stale one cannot double-prefix.
 test("a docs tree at the root needs no prefix", () => {
-  assert.equal(docsRouteBasePath(ctx('/')), '/');
-  assert.equal(docsRouteBasePath({siteConfig: {presets: []}}), '/');
-  assert.equal(docsRouteBasePath({}), '/', "a context with no presets must not throw");
+  assert.equal(docsRouteBasePath(ctx('/')), '');
+  assert.equal(docsRouteBasePath({siteConfig: {presets: []}}), '');
+  assert.equal(docsRouteBasePath({}), '', "a context with no presets must not throw");
 });
 
 test("a docs tree mounted elsewhere is found and normalised", () => {
@@ -35,7 +38,8 @@ test("nothing is prefixed twice, which would be a silent 404 of its own", () => 
 
 test("a root-mounted wiki is untouched, and so is an event with no route", () => {
   const e = {routePath: '/concepts/x'};
-  assert.equal(withBase(e, '/'), e, "returned by identity, so nothing is rebuilt for nothing");
+  assert.equal(withBase(e, ''), e, "returned by identity, so nothing is rebuilt for nothing");
+  assert.equal(withBase(e, '/'), e, "a caller still passing '/' must not double-prefix");
   assert.deepEqual(withBase({title: 'deleted page'}, '/wiki'), {title: 'deleted page'},
     "a deleted page has no link and must not acquire one");
 });

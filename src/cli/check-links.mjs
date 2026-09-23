@@ -36,29 +36,9 @@ import { pathToFileURL } from "url";
 // supported: the `docs: { routeBasePath }` preset option, and the imperative
 // `classic[1].docs.routeBasePath = '/wiki'` some configs use because the preset
 // hardcodes the option. `--route-base <path>` overrides for anything exotic.
-export function docsRouteBasePath(root, override = null) {
-  if (override) return normalizeBase(override);
-  for (const name of ["docusaurus.config.ts", "docusaurus.config.js",
-                      "docusaurus.config.mjs", "docusaurus.config.cjs"]) {
-    const f = join(root, name);
-    if (!existsSync(f)) continue;
-    const src = readFileSync(f, "utf8");
-    // Imperative assignment wins: a config that sets it this way is overriding
-    // whatever the preset declared, so the declared value is the stale one.
-    const imperative = /\bdocs\s*\.\s*routeBasePath\s*=\s*['"`]([^'"`]+)['"`]/.exec(src);
-    if (imperative) return normalizeBase(imperative[1]);
-    const declared = /\bdocs\s*:\s*\{[\s\S]{0,4000}?\brouteBasePath\s*:\s*['"`]([^'"`]+)['"`]/.exec(src);
-    if (declared) return normalizeBase(declared[1]);
-  }
-  return "";
-}
-
-/** "" for root, otherwise "/wiki" with no trailing slash. */
-function normalizeBase(v) {
-  const t = String(v).trim();
-  if (!t || t === "/") return "";
-  return ("/" + t.replace(/^\/+/, "").replace(/\/+$/, ""));
-}
+import { docsRouteBasePathFromConfigFile } from "./docs-base.mjs";
+// Re-exported under the name this gate's tests and callers already use.
+export const docsRouteBasePath = docsRouteBasePathFromConfigFile;
 
 // Everything below is the CLI. It is guarded so that importing this module for
 // its pure helpers does not walk a directory, print, or call process.exit, which

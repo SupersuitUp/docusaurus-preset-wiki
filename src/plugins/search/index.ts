@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import type { LoadContext, Plugin } from '@docusaurus/types';
 import { buildSearchIndex } from './build-index';
+import { docsRouteBasePath } from '../../route-base';
 
 const INDEX_OUTPUT_RELATIVE = 'static/search-index.json';
 
@@ -14,7 +15,9 @@ export default function searchPlugin(context: LoadContext): Plugin {
     name: 'docusaurus-plugin-search',
 
     async loadContent() {
-      const entries = await buildSearchIndex(docsDir);
+      // Search results are links. On a wiki whose docs are not at the root, an index built
+      // without the base sends every hit to a 404.
+      const entries = await buildSearchIndex(docsDir, docsRouteBasePath(context));
       await fs.mkdir(path.dirname(outputPath), { recursive: true });
       await fs.writeFile(
         outputPath,

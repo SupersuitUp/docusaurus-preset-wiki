@@ -5,6 +5,16 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.12.3 (2026-09-23)
+
+**Two branches that each committed a page no longer conflict on the changelog snapshot.** Every branch regenerates `src/data/changelog-events.json` from its own history in the pre-commit hook, so any two of them conflicted on it, and the conflict blocked landing real work behind a generated file (five times in one afternoon in getfreedom-wiki).
+
+- Either side of that conflict is a correct snapshot one commit behind, which the file already promises, and the next commit's hook refreshes it. `wiki install-hooks` (run by `prepare`) now registers a `changelog-snapshot` merge driver that keeps our side, and names the file for it in the clone's own `info/attributes`. **Nothing tracked changes on install**, so a wiki's tree stays clean.
+- A real conflict anywhere else still stops the merge.
+- **DETECTOR:** `git config merge.changelog-snapshot.driver` prints nothing in a wiki clone.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`, then any `pnpm install` (its `prepare` runs `wiki install-hooks`). No wiki content changes.
+- 3 new tests: the conflict without the driver, a clean merge keeping ours with no tracked change, and a page conflict still refused.
+
 ## 1.12.2 (2026-09-23)
 
 **Eleven CLIs, including five gates, did nothing and exited 0 when invoked through a symlink.** pnpm installs every package as a symlink into `.pnpm/`, so this was every consumer of this package.

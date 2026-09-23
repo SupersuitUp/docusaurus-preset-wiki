@@ -98,12 +98,48 @@ export function main(argv = process.argv.slice(2)) {
     }
   }
 
+  /** Every custom page's SOURCE file, so its asset references can be checked. */
+  function pageFiles(dir, out = []) {
+    if (!existsSync(dir)) return out;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) pageFiles(p, out);
+      else if (/\.(tsx?|jsx?)$/.test(e.name)) out.push(p);
+    }
+    return out;
+  }
+
   /** A static asset that really is on disk. */
   const isAsset = (p) => existsSync(join(STATIC, p.replace(/^\//, "")));
 
   addPageRoutes(PAGES);
 
   const problems = [];
+
+  // CUSTOM PAGES ARE SCANNED FOR ASSET REFERENCES, not only harvested for routes.
+  //
+  // Until 2026-09-23 src/pages/*.tsx was read ONLY to learn which routes it serves, so an
+  // <img src="/img/..."> in a custom page pointed at nothing and the build still reported
+  // "no broken internal links". Caught on antisocialcontract.com: a hero image was deleted
+  // and its page kept referencing it, and a full green build shipped a front door with a
+  // hole in it. Docusaurus does not resolve these either, because the value is just a
+  // string; nothing anywhere was checking them.
+  //
+  // Deliberately narrow: ONLY a `src` whose value is a plain double-quoted literal starting
+  // with `/`. Not `to=` and not `href=`, which carry anchors, external URLs and expressions
+  // and would need real route modelling to judge; guessing there would break builds over
+  // links that work, which is how a gate teaches people to bypass it.
+  for (const f of pageFiles(PAGES)) {
+    const lines = readFileSync(f, "utf8").split("\n");
+    lines.forEach((line, i) => {
+      for (const m of line.matchAll(/\bsrc="(\/[^"{}\s]*)"/g)) {
+        const target = m[1];
+        if (isAsset(target)) continue;
+        problems.push({ file: relative(ROOT, f), line: i + 1, target });
+      }
+    });
+  }
+
   for (const f of files) {
     const lines = readFileSync(f, "utf8").split("\n");
     let fenced = false;
@@ -137,7 +173,7 @@ export function main(argv = process.argv.slice(2)) {
   }
   console.error(`\ncheck-links: ${problems.length} broken internal link(s)\n`);
   for (const p of problems) console.error(`  ${p.file}:${p.line}  ->  ${p.target}`);
-  console.error(`\nEvery one of these renders as a link and 404s. Fix the target or the link.`);
+  console.error(`\nEvery one of these renders as a link or an image and 404s. Fix the target or the reference.`);
   if (BASE) {
     console.error(`\nThis wiki serves its docs under ${BASE}, so an in-docs link reads`);
     console.error(`${BASE}/concepts/x, not /concepts/x. That is the usual cause here.`);

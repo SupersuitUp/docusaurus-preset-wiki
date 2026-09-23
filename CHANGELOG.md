@@ -5,6 +5,18 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.12.0 (2026-09-23)
+
+**Both link gates now know where the docs actually live.** A wiki that moves its docs so a homepage can own `/` (`routeBasePath: '/wiki'`) was served two independent, silent 404 factories, and together they held a production deploy at an hour stale while every local check read green.
+
+- **`check-links` read `routeBasePath` instead of assuming `/`.** It derives routes from the `docs/` tree, so with no knowledge of the base it built every route one prefix short and then INVERTED its own verdict: correct links were reported broken and broken ones passed. It told an agent to strip the `/wiki` prefix off 20 correct links across a corpus. The local build passed, because Docusaurus' `onBrokenLinks` does not fire locally on 3.10.1, and five consecutive Vercel production builds failed, because it does fire on a clean CI install. Both config spellings are read: the declared `docs.routeBasePath` preset option and the imperative `classic[1].docs.routeBasePath = '...'` assignment used where the preset hardcodes the option; an imperative assignment wins, being an override. `--route-base <path>` overrides both. A root base normalizes to empty, so **nothing changes for a wiki whose docs are at `/`**.
+- The detected base now prints on success (`41 routes under /wiki`) and the failure hint names it. What made this expensive was that the output gave no sign the gate held a different idea of the routes than the build did. The footer no longer claims `onBrokenLinks` never fires; it is unreliable locally and does fire on a clean CI install.
+- `check-links.mjs` guards its CLI behind `main()`. Importing the module for its pure helpers walked a directory, printed, and called `process.exit`, which silently truncated its own first test run to one test.
+- **`creation-date` moves changelog routes under the docs base.** `routePathFor` builds a route from a page's own `slug:`, which Docusaurus resolves relative to `routeBasePath`, so on a moved wiki every changelog link was a 404. The plugin is the only layer that can see both halves, so the prefix is applied there rather than threaded through the collector.
+- **DETECTOR:** on a wiki with a non-root `routeBasePath`, run `wiki check links`. If it reports zero problems while the site's own in-docs links omit the base, or reports the prefixed links as broken, this defect is present. The honest confirmation is a clean-install build (CI), where `onBrokenLinks` fires.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`, then prefix in-docs links with the base. Every instance's range is a caret, so no `package.json` edit is needed. Root-mounted wikis need no action.
+- 14 tests: 9 in `src/cli/check-links.test.mjs` covering both directions of the inversion and both config spellings, 5 in `src/plugins/creation-date/route-base.test.mjs` including the double-prefix case, which would be a silent 404 of its own.
+
 ## 1.11.0 (2026-09-22)
 
 **Dark mode follows the stylesheet again.** Every text colour here now reads a `--wiki-*` token that declares its dark value in this same file, so a rule and the dark half of that rule cannot be separated by an edit to either one.

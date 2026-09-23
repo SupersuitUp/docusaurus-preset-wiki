@@ -47,3 +47,37 @@ dependency on this repo installs an empty package. Do not reach for one.
 Docusaurus 3.10.1 does not fire it on this machine and **does** fire it on a clean CI install.
 That asymmetry is why `src/cli/check-links.mjs` exists and why a green local build proves
 nothing about a deploy. When a link change is involved, the honest verification is the CI build.
+
+## Anything that emits a doc URL must apply the docs `routeBasePath`
+
+**This is the defect class this package is most prone to, and it has never once appeared in
+only one place.** A wiki may mount its docs anywhere (`routeBasePath: '/wiki'`, so a landing
+page can own `/`). Deriving a route from a file path under `docs/`, or from a page's `slug:`,
+is the obvious thing to write, and nothing about writing it prompts you to ask where the docs
+are mounted. The result is a 404 on every page of whatever surface you just built, and the
+build reports success.
+
+Found in **four** separate places in one sweep on 2026-09-23: the link gate, the changelog
+plugin, the search index, and `llms.txt`. Two were fixed, shipped as 1.12.0, and the other two
+were found only because somebody went looking afterwards.
+
+**So when you add or touch anything that emits a doc URL, use a shared reader:**
+
+| You have | Use |
+|---|---|
+| a `LoadContext` (any plugin) | `docsRouteBasePath(context)` from `src/route-base.ts` |
+| only a directory (a CLI gate, which runs before Docusaurus) | `docsRouteBasePathFromConfigFile(root)` from `src/cli/docs-base.mjs` |
+| a route to move | `withBaseRoute(route, base)`, which never prefixes twice |
+
+The contract is **`''` for a root-mounted wiki**, so the base composes by concatenation and
+every caller's falsy check means the same thing. `'/'` is accepted and treated as no base.
+
+**There are deliberately two readers, and `src/route-base.test.mjs` asserts they agree.** The
+inputs genuinely differ, so one implementation is not available; what is available is a test
+that fails the moment they diverge. Do not add a third reader, and do not replace that test
+with a comment.
+
+**Neither the local build nor a passing gate proves this.** `onBrokenLinks` is unreliable
+locally on 3.10.1 and fires on a clean CI install, and the search index and `llms.txt` are not
+checked by anything at build time at all. The honest detectors are: follow a URL out of
+`llms.txt`, and follow a search hit.

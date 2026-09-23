@@ -5,6 +5,21 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.13.0 (2026-09-23)
+
+**`wiki migrate` moved getfreedom-wiki, the largest copy-based wiki, and six things it got wrong on the way are fixed at the source.** One of them would have put a password door in front of a Freedom-account wiki.
+
+- **A mirrored Freedom-account gate was classified `open`** and replaced by the config middleware, reading a `gate` block with no `type`, which is the PASSWORD gate. `middlewareKind` now returns `account` for any file calling `createFreedomAccountGate`; migrate keeps it as `middleware.pre-package.ts`, writes `gate.type: "freedom-account"` plus the literal `signInUrl` and `openPaths` it finds (a regex behind a const included), and exits 3 naming a person.
+- **A named matcher variant, `skills-are-pages`** (`src/cli/matcher.json` `variants`, chosen by `matcher` in wiki.config.json). The family matcher skips `/skills/` wholesale; on a wiki whose `/skills/*` routes are gated docs pages that publishes them. `wiki check middleware` now holds a wiki to the literal it NAMES and refuses an unknown name. migrate picks the variant when the old matcher let `/skills/` through, so it fails closed.
+- **One owned-paths list** (`src/cli/owned.mjs`) for `wiki check owned-files` and `wiki migrate`. The check had grown four scripts the migration never deleted, so a migrated wiki could refuse its own prebuild.
+- **migrate keeps the wiki's own scripts.** It used to drop every `check*`/`test*` key; now only a script that runs a deleted file goes, and the prebuild keeps the wiki's own steps after `wiki check`, named in the output.
+- **Every markdown tree, not only `docs/`**: migrate's import rewrite and `wiki optimize-images`' reference rewrite both scan a plain-language mirror or any second docs tree. The optimizer also renames a converted image's entry in `scripts/image-provenance-baseline.json`, or the provenance gate calls the `.webp` unrecorded.
+- **`llms.txt` is grouped and briefed** (lifted from getfreedom's generator): the optional `llms_preamble` paragraph, a pointer to `llms-full.txt`, sections in `llms_sections` reading order then A to Z then root pages, section names from their index page, and lines that are only a component or a `<video>` stripped from the full text. A wiki with neither field gets the same pages, now grouped by folder.
+- migrate names any `src/theme/DocItem` or `MDXComponents` it deleted, since a customised one should be restored as an override.
+- **DETECTOR:** a wiki that mirrored `createFreedomAccountGate` and ran `wiki migrate` before 1.13.0 has `wiki.config.json` `gate` with no `type`.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`. A wiki whose `/skills/*` are gated pages sets `"matcher": "skills-are-pages"` and copies the literal `wiki check middleware` prints. Optional: `llms_preamble`, `llms_sections`.
+- 12 new tests (375 total): the account kind and its settings, the variant check both ways, the owned lists agreeing, script keeping, markdown trees, an end-to-end migration of the v1.1.3 template carrying an account gate and a plain mirror, the optimizer across trees and the baseline, and four for the llms generator. The llms and optimizer tests were run against the old code and fail there.
+
 ## 1.12.3 (2026-09-23)
 
 **Two branches that each committed a page no longer conflict on the changelog snapshot.** Every branch regenerates `src/data/changelog-events.json` from its own history in the pre-commit hook, so any two of them conflicted on it, and the conflict blocked landing real work behind a generated file (five times in one afternoon in getfreedom-wiki).

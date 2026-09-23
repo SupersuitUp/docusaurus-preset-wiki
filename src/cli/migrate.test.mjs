@@ -5,7 +5,9 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { tokensOnly, configCustomisations, rewriteDocsImports, middlewareKind } from './migrate.mjs';
+import { tokensOnly, configCustomisations, rewriteDocsImports, middlewareKind, accountGateSettings, markdownTrees, migrateScripts, OWNED_PATHS } from './migrate.mjs';
+import { OWNED } from './owned.mjs';
+import { matcherSource } from './matcher.mjs';
 import { changelogBetween } from './upgrade.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -94,4 +96,105 @@ test('middlewareKind tells the three shapes apart, and a password gate is never 
   assert.equal(middlewareKind("const password = process.env.WIKI_PASSWORD ?? '';"), 'password');
   assert.equal(middlewareKind("const password = process.env.WIKI_PASSWORD; const members = [];"), 'identity');
   assert.equal(middlewareKind("GOOGLE_OAUTH_CLIENT_ID"), 'identity');
+});
+
+// --- 1.13.0: the getfreedom-wiki migration (2026-09-23) ----------------------------------------
+
+const ACCOUNT_MW = `import { createFreedomAccountGate } from './src/gate/accountGate';
+const OPEN_PATHS = /^\\/(llms\\.txt|llms-full\\.txt)$|\\.(?:md|txt|json)$/i;
+const gate = createFreedomAccountGate({
+  signInUrl: 'https://portal.example/wiki/sign-in',
+  openPaths: OPEN_PATHS,
+});
+export default async function middleware(request) { return undefined; }
+export const config = {
+  matcher: [
+    '/((?!assets/|img/|favicon\\\\.ico|.*\\\\.(?:js|css|md)$).*)',
+  ],
+  runtime: 'edge',
+};
+`;
+
+test('a mirrored Freedom-account gate is its own kind, never mistaken for the open template', () => {
+  assert.equal(middlewareKind(ACCOUNT_MW), 'account');
+  assert.equal(middlewareKind("export default async function middleware() {}"), 'open');
+});
+
+test('accountGateSettings carries the literal signInUrl, the openPaths regex behind a const, and fails the matcher CLOSED', () => {
+  const { gate, matcher } = accountGateSettings(ACCOUNT_MW);
+  assert.deepEqual(gate, { type: 'freedom-account', signInUrl: 'https://portal.example/wiki/sign-in', openPaths: '^/(llms\\.txt|llms-full\\.txt)$|\\.(?:md|txt|json)$' });
+  assert.ok(new RegExp(gate.openPaths, 'i').test('/skills/x/SKILL.md') && !new RegExp(gate.openPaths, 'i').test('/skills/x'));
+  assert.equal(matcher, 'skills-are-pages', 'an old matcher that let /skills/ through means those routes were gated pages');
+  const familyish = ACCOUNT_MW.replace('assets/|', 'assets/|skills/|');
+  assert.equal(accountGateSettings(familyish).matcher, undefined, 'a matcher that already skipped skills/ keeps the family one');
+});
+
+test('markdownTrees finds every docs tree, and none of the folders that only look like one', () => {
+  const d = mkdtempSync(join(tmpdir(), 'wiki-trees-'));
+  for (const [dir, file] of [['docs', 'a.md'], ['plain', 'b.mdx'], ['node_modules/x', 'c.md'], ['static/skills/y', 'SKILL.md'], ['src/pages', 'd.md'], ['empty', 'x.txt']]) {
+    mkdirSync(join(d, dir), { recursive: true }); writeFileSync(join(d, dir, file), '# x');
+  }
+  assert.deepEqual(markdownTrees(d), ['docs', 'plain']);
+});
+
+test('migrateScripts drops only what runs a deleted file, and keeps the wiki\'s own checks in the prebuild', () => {
+  const { scripts, keptPrebuild } = migrateScripts({
+    prebuild: 'node scripts/check-gate-mirror.mjs && node scripts/check-links.mjs && node scripts/make-redirects.mjs && node --import ./scripts/ts-resolve-hooks.mjs scripts/test-changelog-routes.mjs',
+    'check:links': 'node scripts/check-links.mjs',
+    'check:docs': 'node scripts/check-docs.mjs',
+    'test:plain': 'node scripts/test-plain-twins.mjs',
+    'test:unlock-link': 'node --test scripts/unlock-link.test.mjs',
+    start: 'docusaurus start',
+  });
+  assert.equal(scripts.prebuild, 'wiki check && node scripts/check-gate-mirror.mjs && node scripts/make-redirects.mjs');
+  assert.deepEqual(keptPrebuild, ['node scripts/check-gate-mirror.mjs', 'node scripts/make-redirects.mjs']);
+  assert.equal(scripts['check:links'], undefined, 'the template check the package now runs is gone');
+  assert.equal(scripts['test:unlock-link'], undefined);
+  assert.equal(scripts['check:docs'], 'node scripts/check-docs.mjs', 'the wiki\'s own check survives');
+  assert.equal(scripts['test:plain'], 'node scripts/test-plain-twins.mjs');
+  assert.equal(scripts.start, 'docusaurus start');
+  assert.equal(migrateScripts({}).scripts.prebuild, 'wiki check', 'a template wiki gets exactly what it got before');
+});
+
+test('migrate deletes everything the owned-files check refuses, so a migrated wiki passes its own prebuild', () => {
+  for (const p of OWNED) assert.ok(OWNED_PATHS.includes(p), `migrate never deletes ${p}, which the check then refuses`);
+});
+
+test('an account-gated wiki with a plain mirror migrates onto the config gate, the closed matcher, and every tree', { skip: !haveTemplate && 'wiki-template checkout not beside this repo' }, () => {
+  const d = templateAt('v1.1.3');
+  writeFileSync(join(d, 'middleware.ts'), ACCOUNT_MW);
+  mkdirSync(join(d, 'plain'), { recursive: true });
+  writeFileSync(join(d, 'plain', 'changelog.mdx'), "import Changelog from '@site/src/components/Changelog';\n\n<Changelog />\n");
+  mkdirSync(join(d, 'src/theme/MDXComponents/A'), { recursive: true });
+  writeFileSync(join(d, 'src/theme/MDXComponents/A/index.tsx'), '// this wiki\'s own\n');
+  const r = spawnSync(process.execPath, [BIN, 'migrate', '--no-install', '--no-build'], { cwd: d, encoding: 'utf8' });
+  assert.equal(r.status, 3, r.stdout + r.stderr);
+  assert.match(r.stdout, /NEEDS A PERSON: middleware\.ts mirrored the package's Freedom-account gate/);
+  assert.match(r.stdout, /restore it with `git checkout -- <path>`/, 'a deleted theme override is named');
+  assert.equal(readFileSync(join(d, 'middleware.pre-package.ts'), 'utf8'), ACCOUNT_MW, 'kept byte for byte');
+  const cfg = JSON.parse(readFileSync(join(d, 'wiki.config.json'), 'utf8'));
+  assert.equal(cfg.gate.type, 'freedom-account', 'never the password gate an untyped block means');
+  assert.equal(cfg.gate.signInUrl, 'https://portal.example/wiki/sign-in');
+  assert.equal(cfg.matcher, 'skills-are-pages');
+  const mw = readFileSync(join(d, 'middleware.ts'), 'utf8');
+  assert.ok(mw.includes(`'${matcherSource('skills-are-pages')}'`), 'the variant literal is written');
+  assert.equal(spawnSync(process.execPath, [BIN, 'check', 'middleware'], { cwd: d, encoding: 'utf8' }).status, 0, 'and the check accepts it');
+  assert.match(readFileSync(join(d, 'plain/changelog.mdx'), 'utf8'), /@theme\/Changelog/, 'the mirror is rewritten too');
+});
+
+test('check middleware holds a wiki to the variant it NAMES, and refuses a name the package does not ship', () => {
+  const d = mkdtempSync(join(tmpdir(), 'wiki-mw-'));
+  const file = (name) => `export default 1;\nexport const config = {\n  matcher: [\n    '${matcherSource(name)}',\n  ],\n  runtime: 'edge',\n};\n`;
+  const run = () => spawnSync(process.execPath, [BIN, 'check', 'middleware'], { cwd: d, encoding: 'utf8' });
+  writeFileSync(join(d, 'middleware.ts'), file('default'));
+  writeFileSync(join(d, 'wiki.config.json'), '{}');
+  assert.equal(run().status, 0, 'no name, the family matcher');
+  writeFileSync(join(d, 'wiki.config.json'), JSON.stringify({ matcher: 'skills-are-pages' }));
+  const wrong = run();
+  assert.equal(wrong.status, 1, 'naming the variant and carrying the family literal publishes /skills/');
+  assert.match(wrong.stderr, /skills-are-pages/);
+  writeFileSync(join(d, 'middleware.ts'), file('skills-are-pages'));
+  assert.equal(run().status, 0);
+  writeFileSync(join(d, 'wiki.config.json'), JSON.stringify({ matcher: 'made-up' }));
+  assert.match(run().stderr, /unknown matcher "made-up"/);
 });

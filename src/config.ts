@@ -24,6 +24,11 @@ export interface WikiConfig {
   /** Reader analytics (src/analytics/reads.ts). false turns it off; an object names the sink. */
   analytics?: boolean | { endpoint?: string };
   og?: { bg?: string; accent?: string; text?: string; muted?: string };
+  /** Which middleware matcher literal the instance carries (src/cli/matcher.mjs). */
+  matcher?: 'default' | 'skills-are-pages';
+  /** llms.txt: a paragraph for the agent before the index, and the reading order of docs/ sections. */
+  llms_preamble?: string;
+  llms_sections?: string[];
   intake_mode?: 'source-grounded' | 'authored-canon';
   skill_prefix?: string;
   hero_register?: Record<string, unknown>;

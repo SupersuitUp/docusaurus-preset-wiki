@@ -141,7 +141,9 @@
     "analytics": {
       "description": "Reader analytics: who reads which page, told from the edge (src/analytics/reads.ts). Absent or true: a freedom-account wiki reports to its own portal (<origin of gate.signInUrl>/api/wiki-reads), any other wiki sends nothing unless WIKI_ANALYTICS_URL is set. false: nothing is ever sent. An object names the sink. Events carry the page, the reader the signed grant names (or key, password, anonymous, share), country and mobile/desktop; never an IP or a raw user agent.",
       "oneOf": [
-        { "type": "boolean" },
+        {
+          "type": "boolean"
+        },
         {
           "type": "object",
           "additionalProperties": false,
@@ -359,6 +361,25 @@
           "description": "Description/domain text color (hex)"
         }
       }
+    },
+    "matcher": {
+      "type": "string",
+      "enum": [
+        "default",
+        "skills-are-pages"
+      ],
+      "description": "Which middleware matcher literal middleware.ts must carry (`wiki check middleware` refuses any other). `default` (or absent) is the family matcher, which skips /skills/ and /generators/ wholesale because they hold agent files. `skills-are-pages` is for a gated wiki whose /skills/* routes are DOCS PAGES: it lets them reach the gate and skips only .md, llms.txt and llms-full.txt."
+    },
+    "llms_preamble": {
+      "type": "string",
+      "description": "A paragraph for the agent that opens llms.txt and llms-full.txt, before the index: what this tree is and in what order to read it."
+    },
+    "llms_sections": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Top-level folders of docs/ in the order an agent should read them in llms.txt and llms-full.txt. Folders not named still appear, after these, alphabetically."
     }
   }
 }

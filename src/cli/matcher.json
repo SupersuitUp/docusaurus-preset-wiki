@@ -1,5 +1,10 @@
 {
   "matcher": [
     "/((?!assets/|img/|skills/|generators/|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|.*\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml)$).*)"
-  ]
+  ],
+  "variants": {
+    "skills-are-pages": [
+      "/((?!assets/|img/|favicon\\.ico|robots\\.txt|llms\\.txt|llms-full\\.txt|sitemap\\.xml|manifest\\.json|.*\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml|md)$).*)"
+    ]
+  }
 }

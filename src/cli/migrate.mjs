@@ -34,6 +34,8 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { ensurePrepare } from "./install-hooks.mjs";
 import { isDirectRun } from "./is-direct-run.mjs";
+import { MIGRATE_DELETES } from "./owned.mjs";
+import { matcherSource } from "./matcher.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.cwd();
@@ -41,20 +43,7 @@ const args = process.argv.slice(2);
 const DRY = args.includes("--dry-run");
 const PKG = "@supersuit/docusaurus-preset-wiki";
 
-export const OWNED_PATHS = [
-  "plugins/search-plugin", "plugins/creation-date-plugin", "plugins/og-image-plugin",
-  "plugins/manifest-plugin", "plugins/share-view-plugin",
-  "src/components/ShareButton.tsx", "src/components/PageDates.tsx",
-  "src/components/Changelog.tsx", "src/components/ChangelogWidget.tsx",
-  "src/theme/DocItem", "src/theme/MDXComponents", "src/share",
-  "scripts/check-links.mjs", "scripts/check-image-weight.mjs", "scripts/check-image-provenance.mjs",
-  "scripts/check-admonitions.mjs", "scripts/unlock-link.mjs", "scripts/unlock-link.test.mjs",
-  "scripts/generate-llms-txt.sh", "scripts/llms-txt-env.mjs", "scripts/test-image-provenance.mjs",
-  "scripts/ts-resolve-hooks.mjs", "scripts/ts-resolve-loader.mjs",
-  "scripts/build-icons.py", "scripts/optimize-images.py",
-  "scripts/check-template-version.mjs", "scripts/check-template-version.test.mjs", "scripts/bump.sh",
-  "TEMPLATE-VERSION", "wiki.config.schema.json",
-];
+export const OWNED_PATHS = MIGRATE_DELETES;
 export const ABSORBED_DEPS = ["minisearch", "satori", "@resvg/resvg-js", "gray-matter", "glob", "remark", "strip-markdown", "@easyops-cn/docusaurus-search-local"];
 
 const log = (m) => console.log(`[migrate] ${m}`);
@@ -71,29 +60,34 @@ function write(p, text) {
  *  the template never shipped that, so it was written by a person. `identity` carries a door the
  *  package has no equivalent for. Identity wins over password because such a file reads both. */
 export function middlewareKind(text) {
+  // The package's own account gate, carried as a mirror before the wiki was on the package.
+  // Checked FIRST: until 1.13.0 such a file matched none of the patterns below, was called
+  // `open`, and was replaced by the config middleware reading a gate block with no type, which
+  // is the PASSWORD gate: a Freedom-account wiki came out of a clean-looking migration asking
+  // readers for a password nobody had set (getfreedom-wiki, 2026-09-23, caught before deploy).
+  if (/createFreedomAccountGate/.test(text)) return "account";
   if (/GOOGLE_OAUTH|GATE_IDENTITY|member/i.test(text)) return "identity";
   if (/WIKI_PASSWORD/.test(text)) return "password";
   return "open";
 }
 
-export function matcherLiteral() {
-  const { matcher } = JSON.parse(readFileSync(join(HERE, "matcher.json"), "utf8"));
-  return matcher[0].replace(/\\/g, "\\\\");
+export function matcherLiteral(name) {
+  return matcherSource(name);
 }
 
-const CONFIG_BLOCK = () => `// Vercel reads \`config\` STATICALLY from this file, so it cannot come from the package: a
+const CONFIG_BLOCK = (name) => `// Vercel reads \`config\` STATICALLY from this file, so it cannot come from the package: a
 // re-export is invisible to it and the middleware runs on every path, which on a gated wiki
 // 401s its own og cards and manifest. The literal is the package's; \`wiki check middleware\`
 // refuses a build where it drifts.
 export const config = {
   matcher: [
-    '${matcherLiteral()}',
+    '${matcherLiteral(name)}',
   ],
   runtime: 'edge',
 };
 `;
 
-export const OPEN_MIDDLEWARE = () => `// Vercel Routing Middleware: the family bot-block, the one-page share layer, and whatever gate
+export const OPEN_MIDDLEWARE = (name) => `// Vercel Routing Middleware: the family bot-block, the one-page share layer, and whatever gate
 // wiki.config.json declares, all from the preset. With no \`gate\` block this is the family
 // password gate, dark until WIKI_PASSWORD and WIKI_GATE_SECRET are set on the deployment
 // (\`wiki gate set --password "<word>"\`); \`"gate": { "type": "freedom-account" }\` is the door
@@ -104,7 +98,7 @@ import { createMiddlewareFromConfig } from '${PKG}/middleware';
 
 export default createMiddlewareFromConfig(wiki);
 
-${CONFIG_BLOCK()}`;
+${CONFIG_BLOCK(name)}`;
 
 export const PASSWORD_MIDDLEWARE = ({ machinePaths } = {}) => `// Vercel Routing Middleware: bot-block, one-page shares and the family password gate, all from
 // the preset. The gate is dark until WIKI_PASSWORD and WIKI_GATE_SECRET are set on the deployment;
@@ -162,6 +156,62 @@ export function configCustomisations(ts) {
   return notes;
 }
 
+/** What a mirrored account-gate middleware configured, as wiki.config.json `gate` fields plus the
+ *  matcher variant it needs. Only literals are read: a value computed at runtime is left for the
+ *  person the migration names. */
+export function accountGateSettings(text) {
+  const gate = { type: "freedom-account" };
+  const sign = text.match(/signInUrl:\s*(['"`])([^'"`]+)\1/);
+  if (sign) gate.signInUrl = sign[2];
+  let open = text.match(/openPaths:\s*\/((?:\\\/|[^\/\n])+)\/[a-z]*/);
+  if (!open) {
+    const ref = text.match(/openPaths:\s*([A-Za-z_$][\w$]*)/);
+    if (ref) open = text.match(new RegExp(`const\\s+${ref[1]}\\s*=\\s*\\/((?:\\\\\\/|[^\\/\\n])+)\\/[a-z]*`));
+  }
+  if (open) gate.openPaths = open[1].replace(/\\\//g, "/");
+  // A matcher that does not skip `skills/` means /skills/* reached this gate on purpose: those
+  // routes are gated pages here. The family matcher skips the prefix, which would publish them,
+  // so the migration picks the variant that keeps them behind the door. Fails closed.
+  const m = text.match(/matcher:\s*\[\s*(['"])(.*?)\1/s);
+  const matcher = m && !m[2].includes("skills/") ? "skills-are-pages" : undefined;
+  return { gate, matcher };
+}
+
+/** Every markdown tree a docs instance may read: `docs/` and any other top-level folder holding
+ *  .md/.mdx (a plain-language mirror, a second docs instance). Until 1.13.0 only `docs/` was
+ *  rewritten, so a wiki's `plain/` mirror kept importing components the migration had deleted. */
+const NOT_DOCS = new Set(["node_modules", "build", ".docusaurus", ".git", ".claude", "static", "src", "scripts", "plugins", "illustrations", "templates", "review", ".vercel"]);
+export function markdownTrees(root) {
+  return readdirSync(root, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !NOT_DOCS.has(e.name) && !e.name.startsWith("."))
+    .map((e) => e.name)
+    .filter((d) => walk(join(root, d)).some((f) => /\.mdx?$/.test(f)))
+    .sort();
+}
+
+/** The wiki's scripts after migration: a script is dropped only when its command runs something
+ *  the migration deleted, so the wiki's OWN checks and tests survive (until 1.13.0 every key
+ *  starting check/test/share/... went, which took getfreedom's 30 own checks with the template's).
+ *  The prebuild keeps the commands that still have a file to run, after `wiki check`. */
+export function migrateScripts(scripts, deleted = OWNED_PATHS) {
+  const s = { ...scripts };
+  const runsDeleted = (cmd) => deleted.some((p) => cmd.includes(p)) || /ts-resolve-(hooks|loader)/.test(cmd);
+  const kept = [];
+  for (const [k, v] of Object.entries(s)) {
+    if (k === "prebuild") continue;
+    if (runsDeleted(String(v))) delete s[k];
+  }
+  const ownPre = String(s.prebuild ?? "").split(/\s*&&\s*/).map((c) => c.trim()).filter(Boolean)
+    .filter((c) => !runsDeleted(c) && c !== "wiki check");
+  kept.push(...ownPre);
+  delete s.prebuild;
+  Object.assign(s, {
+    prebuild: ["wiki check", ...ownPre].join(" && "),
+    check: "wiki check", share: "wiki share", icons: "wiki icons", "optimize:images": "wiki optimize-images",
+  });
+  return { scripts: s, keptPrebuild: kept };
+}
+
 export function rewriteDocsImports(text) {
   return text
     .replace(/@site\/src\/components\/ChangelogWidget/g, "@theme/ChangelogWidget")
@@ -193,6 +243,8 @@ export function migrate() {
   const warnings = [];
 
   // 1. owned paths
+  const themeCopies = ["src/theme/DocItem", "src/theme/MDXComponents"].filter((p) => existsSync(rel(p)));
+  if (themeCopies.length) warnings.push(`deleted ${themeCopies.join(" and ")}, the template's copies of what the package now ships. If this wiki had customised one, restore it with \`git checkout -- <path>\`: a file there shadows the package's, which is the supported override.`);
   for (const p of OWNED_PATHS) {
     if (!existsSync(rel(p))) continue;
     if (DRY) { log(`would delete ${p}`); continue; }
@@ -218,7 +270,17 @@ export function migrate() {
   // 3. middleware.ts
   if (existsSync(rel("middleware.ts"))) {
     const kind = middlewareKind(read("middleware.ts"));
-    if (kind === "identity") warnings.push("middleware.ts has a gate of its own (identity or a member list). Left untouched: move its verdict into `async function gate(request): Promise<GateVerdict>` and export createMiddleware({ gate }) plus the matcher literal (see the package README).");
+    if (kind === "account") {
+      const old = read("middleware.ts");
+      const { gate, matcher } = accountGateSettings(old);
+      if (!DRY) renameSync(rel("middleware.ts"), rel("middleware.pre-package.ts"));
+      const cfg = JSON.parse(read("wiki.config.json"));
+      cfg.gate = { ...(cfg.gate && typeof cfg.gate === "object" ? cfg.gate : {}), ...gate };
+      if (matcher) cfg.matcher = matcher;
+      write("wiki.config.json", JSON.stringify(cfg, null, 2) + "\n");
+      write("middleware.ts", OPEN_MIDDLEWARE(matcher));
+      warnings.push(`middleware.ts mirrored the package's Freedom-account gate; kept as middleware.pre-package.ts. wiki.config.json now declares gate ${JSON.stringify(cfg.gate)}${matcher ? ` and the "${matcher}" matcher, because the old matcher let /skills/ reach the gate` : ""}. Check those against the kept file (anything computed rather than literal was not carried), then delete it and any src/gate or src/analytics mirror.`);
+    } else if (kind === "identity") warnings.push("middleware.ts has a gate of its own (identity or a member list). Left untouched: move its verdict into `async function gate(request): Promise<GateVerdict>` and export createMiddleware({ gate }) plus the matcher literal (see the package README).");
     else if (kind === "password") {
       // A person wrote this gate: the template never shipped one. Until 1.5.0 it was overwritten
       // with the package default, whose machine paths are OPEN, and a private wiki whose own gate
@@ -251,8 +313,8 @@ export function migrate() {
 
   // 5. docs imports
   let rewritten = 0;
-  if (existsSync(rel("docs"))) {
-    for (const f of walk(rel("docs"))) {
+  for (const tree of markdownTrees(ROOT)) {
+    for (const f of walk(rel(tree))) {
       if (!/\.mdx?$/.test(f)) continue;
       const t = readFileSync(f, "utf8"); const n = rewriteDocsImports(t);
       if (n !== t) { rewritten += 1; if (!DRY) writeFileSync(f, n); }
@@ -265,10 +327,9 @@ export function migrate() {
   for (const d of ABSORBED_DEPS) delete deps[d];
   deps[PKG] = args.find((a, i) => args[i - 1] === "--version") ? `^${args[args.indexOf("--version") + 1]}` : "^1.0.0";
   pkg.dependencies = Object.fromEntries(Object.entries(deps).sort());
-  const s = pkg.scripts ?? {};
-  for (const k of Object.keys(s)) if (/^(check|test|template|share|optimize|accept|icons)/.test(k)) delete s[k];
-  Object.assign(s, { prebuild: "wiki check", check: "wiki check", share: "wiki share", icons: "wiki icons", "optimize:images": "wiki optimize-images" });
+  const { scripts: s, keptPrebuild } = migrateScripts(pkg.scripts ?? {});
   pkg.scripts = s;
+  if (keptPrebuild.length) warnings.push(`the prebuild kept this wiki's own steps after \`wiki check\`: ${keptPrebuild.join(" ; ")}. Each still has its file; confirm none duplicates a \`wiki check\` step.`);
   ensurePrepare(pkg);
   write("package.json", JSON.stringify(pkg, null, 2) + "\n");
   const wc = JSON.parse(read("wiki.config.json"));

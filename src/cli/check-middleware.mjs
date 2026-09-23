@@ -9,12 +9,14 @@
 //
 // So the literal lives in the instance, and this check refuses a build where it has drifted
 // from the package's copy (src/cli/matcher.json, which the runtime MATCHER also reads).
+//
+// Which literal: the family one, or the named variant wiki.config.json's `matcher` declares
+// (src/cli/matcher.mjs). A wiki picks among the package's literals and never writes its own.
 import { existsSync, readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { matcherSource, declaredMatcher } from "./matcher.mjs";
 
 const ROOT = process.cwd();
-const HERE = dirname(fileURLToPath(import.meta.url));
 const file = join(ROOT, "middleware.ts");
 
 if (!existsSync(file)) {
@@ -22,9 +24,10 @@ if (!existsSync(file)) {
   process.exit(0);
 }
 const src = readFileSync(file, "utf8");
-const { matcher } = JSON.parse(readFileSync(join(HERE, "matcher.json"), "utf8"));
-// The JSON value is the regex text; in TS source each backslash is written doubled.
-const literal = matcher[0].replace(/\\/g, "\\\\");
+const name = declaredMatcher(ROOT);
+let literal;
+try { literal = matcherSource(name); }
+catch (e) { console.error(`[middleware] ${e.message}`); process.exit(1); }
 
 const problems = [];
 if (/export\s*\{[^}]*\bconfig\b[^}]*\}\s*from/.test(src)) {
@@ -34,10 +37,10 @@ if (!/export\s+const\s+config\s*=/.test(src)) {
   problems.push("no `export const config = { ... }` in middleware.ts; the middleware will run on every path.");
 }
 if (!src.includes(`'${literal}'`) && !src.includes(`"${literal}"`)) {
-  problems.push("the matcher literal differs from the package's (or is missing). Copy it exactly:\n    '" + literal + "'");
+  problems.push(`the matcher literal differs from the package's ${name ? `"${name}" variant` : "family matcher"} (or is missing). Copy it exactly:\n    '` + literal + "'");
 }
 if (problems.length) {
   console.error("[middleware] " + problems.join("\n[middleware] "));
   process.exit(1);
 }
-console.log("[middleware] ok: config declared literally, matcher matches the package");
+console.log(`[middleware] ok: config declared literally, matcher matches the package's ${name ? `"${name}" variant` : "family matcher"}`);

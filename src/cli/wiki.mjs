@@ -6,44 +6,13 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { OWNED } from './owned.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.cwd();
 const [cmd, ...rest] = process.argv.slice(2);
 
-// Paths the package owns, by the exact names the template shipped them under. Their presence
-// in an instance means the framework was forked again, which is the one failure the package
-// exists to prevent. Deliberately NOT `plugins/` or `src/theme/` wholesale: an instance may
-// carry a plugin of its own (a book wiki's chat plugin) or swizzle one component, and both are
-// the escape hatch, not the fork.
-const OWNED = [
-  'plugins/search-plugin',
-  'plugins/creation-date-plugin',
-  'plugins/og-image-plugin',
-  'plugins/manifest-plugin',
-  'plugins/share-view-plugin',
-  'src/components/ShareButton.tsx',
-  'src/components/PageDates.tsx',
-  'src/components/Changelog.tsx',
-  'src/components/ChangelogWidget.tsx',
-  'src/share',
-  'scripts/check-links.mjs',
-  'scripts/check-image-weight.mjs',
-  'scripts/check-image-provenance.mjs',
-  'scripts/check-admonitions.mjs',
-  'scripts/check-ascii-diagrams.mjs',
-  'scripts/check-page-graphics.mjs',
-  'scripts/check-voice.mjs',
-  'scripts/check-retired-words.mjs',
-  'scripts/unlock-link.mjs',
-  'scripts/generate-llms-txt.sh',
-  'scripts/llms-txt-env.mjs',
-  'scripts/build-icons.py',
-  'scripts/optimize-images.py',
-  'scripts/check-template-version.mjs',
-  'scripts/bump.sh',
-  'TEMPLATE-VERSION',
-];
+// Paths the package owns: one list, shared with `wiki migrate` (src/cli/owned.mjs).
 
 function node(script, ...args) {
   const r = spawnSync(process.execPath, [join(HERE, script), ...args], { cwd: ROOT, stdio: 'inherit' });

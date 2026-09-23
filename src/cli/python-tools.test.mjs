@@ -44,3 +44,26 @@ for n in ("a", "b"):
   assert.equal(bad.status, 2);
   assert.match(bad.stderr, /not an image under static/);
 });
+
+test('optimize-images rewrites a reference in EVERY markdown tree and the provenance baseline, not only docs/', { skip: !havePillow && 'python3 with Pillow not on this machine' }, () => {
+  // getfreedom-wiki, 2026-09-23: the poster was converted, docs/ was rewritten, and the plain/
+  // mirror kept pointing at the deleted .png. check-links reads docs/ only, so nothing said so.
+  const d = mkdtempSync(join(tmpdir(), 'wiki-py-'));
+  for (const dir of ['static/video', 'docs', 'plain', 'node_modules/x']) mkdirSync(join(d, dir), { recursive: true });
+  writeFileSync(join(d, 'wiki.config.json'), '{}');
+  const draw = spawnSync('python3', ['-c', `
+from PIL import Image
+Image.new("RGB", (1920, 100), (200, 100, 50)).save("${join(d, 'static', 'video')}/poster.png")
+`], { encoding: 'utf8' });
+  assert.equal(draw.status, 0, draw.stderr);
+  const ref = '<video poster="/video/poster.png"></video>\n';
+  for (const f of ['docs/a.md', 'plain/a.md', 'node_modules/x/a.md']) writeFileSync(join(d, f), ref);
+  mkdirSync(join(d, 'scripts'));
+  writeFileSync(join(d, 'scripts/image-provenance-baseline.json'), JSON.stringify({ baseline: ['static/video/poster.png'] }));
+  const r = spawnSync('python3', [join(PY, 'optimize-images.py')], { cwd: d, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(readFileSync(join(d, 'docs/a.md'), 'utf8'), /poster\.webp/);
+  assert.match(readFileSync(join(d, 'plain/a.md'), 'utf8'), /poster\.webp/, 'the mirror is rewritten too');
+  assert.match(readFileSync(join(d, 'node_modules/x/a.md'), 'utf8'), /poster\.png/, 'node_modules is never touched');
+  assert.deepEqual(JSON.parse(readFileSync(join(d, 'scripts/image-provenance-baseline.json'), 'utf8')).baseline, ['static/video/poster.webp'], 'a baselined image keeps its baseline entry across the rename');
+});

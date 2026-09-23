@@ -76,7 +76,25 @@ self_test()
 
 # Where a reference to a static asset can live.
 TEXT_DIRS = ["docs", "blog", "src", "static/skills"]
-TEXT_FILES = ["docusaurus.config.ts", "sidebars.ts", "wiki.config.json"]
+TEXT_FILES = ["docusaurus.config.ts", "sidebars.ts", "wiki.config.json",
+              # The provenance gate's baseline names pre-gate images by path, so a converted one
+              # has to move with its rename or the gate calls the .webp an image with no recipe.
+              "scripts/image-provenance-baseline.json"]
+# Any other top-level folder holding markdown is a docs tree too (a plain-language mirror, a
+# second docs instance). Until 1.13.0 only the list above was scanned, so converting an image
+# rewrote docs/ and left plain/ pointing at the deleted .png (getfreedom-wiki, 2026-09-23).
+NOT_DOCS = {"node_modules", "build", ".docusaurus", ".git", ".claude", ".vercel", "static", "src",
+            "scripts", "plugins", "illustrations", "templates", "review"}
+
+
+def markdown_trees(root):
+    out = []
+    for d in sorted(root.iterdir()):
+        if not d.is_dir() or d.name in NOT_DOCS or d.name.startswith(".") or d.name in TEXT_DIRS:
+            continue
+        if any(p.suffix.lower() in {".md", ".mdx"} for p in d.rglob("*") if p.is_file()):
+            out.append(d.name)
+    return out
 TEXT_EXT = {".md", ".mdx", ".ts", ".tsx", ".js", ".jsx", ".json", ".html", ".yml", ".yaml"}
 
 dry = "--dry-run" in sys.argv
@@ -245,7 +263,7 @@ def repair_sidecars() -> int:
 
 
 def text_files():
-    for d in TEXT_DIRS:
+    for d in TEXT_DIRS + markdown_trees(ROOT):
         for p in (ROOT / d).rglob("*"):
             if p.is_file() and p.suffix.lower() in TEXT_EXT:
                 yield p

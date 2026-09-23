@@ -128,3 +128,45 @@ test("invoked through a SYMLINK, a broken link still fails", () => {
   rmSync(d, { recursive: true, force: true });
   rmSync(linkDir, { recursive: true, force: true });
 });
+
+// Custom pages are scanned for asset references, added 2026-09-23 after a green build
+// shipped a front door whose <img src> pointed at a deleted file.
+function wikiWithPage(page, assets = []) {
+  const dir = mkdtempSync(join(tmpdir(), "check-links-page-"));
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs", "a.md"), "x");
+  mkdirSync(join(dir, "src", "pages"), { recursive: true });
+  writeFileSync(join(dir, "src", "pages", "door.tsx"), page);
+  for (const a of assets) {
+    const f = join(dir, "static", a);
+    mkdirSync(join(f, ".."), { recursive: true });
+    writeFileSync(f, "binary");
+  }
+  return dir;
+}
+
+test("a page img src pointing at a missing asset is caught", () => {
+  const d = wikiWithPage(`export default () => <img src="/img/gone.webp" />;`);
+  const r = run(d);
+  assert.notEqual(r.code, 0, "a missing page asset must fail the build");
+  assert.match(r.out, /\/img\/gone\.webp/);
+  assert.match(r.out, /door\.tsx/);
+  rmSync(d, { recursive: true, force: true });
+});
+
+test("a page img src pointing at a real asset passes", () => {
+  const d = wikiWithPage(`export default () => <img src="/img/there.webp" />;`, ["img/there.webp"]);
+  const r = run(d);
+  assert.equal(r.code, 0, r.out);
+  rmSync(d, { recursive: true, force: true });
+});
+
+test("an external or expression src is left alone", () => {
+  const d = wikiWithPage(
+    `const a = <img src="https://example.com/x.png" />;\n` +
+    `const b = <img src={someVar} />;\n` +
+    `const c = <img src="relative.png" />;\n`);
+  const r = run(d);
+  assert.equal(r.code, 0, "only a rooted literal src is this gate's business:\n" + r.out);
+  rmSync(d, { recursive: true, force: true });
+});

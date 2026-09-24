@@ -128,6 +128,10 @@
           "type": "string",
           "description": "freedom-account only. A regular expression (source text, case-insensitive) of paths served with no sign-in. REPLACES the default (hosted skills and generators, llms.txt, .md/.txt/media/.pdf); use it on a wiki whose /skills/ prefix is a docs reference and only the .md files under it are for agents."
         },
+        "allowEnv": {
+          "type": "string",
+          "description": "freedom-account only. The NAME of an environment variable holding the account ids allowed in, comma-separated (e.g. WIKI_ALLOWED_ACCOUNTS). Set: only those accounts are admitted, and an empty or missing variable admits nobody. Absent: every active account is admitted. The ids live in the deployment, never in this file."
+        },
         "grantDays": {
           "type": "number",
           "description": "freedom-account only. How long one sign-in lasts. Default 7."

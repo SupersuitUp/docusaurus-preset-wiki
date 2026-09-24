@@ -83,3 +83,19 @@ test('unlockParamFor follows the type: key for a password, k for an account, and
   assert.equal(unlockParamFor({ unlockParam: null }), null);
   assert.equal(unlockParamFor({ type: 'none' }), null);
 });
+
+test('allowEnv names the env var holding the allowed account ids, read per request', async () => {
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const grant = (uid: string) => `fw_gate=v1.${uid}.${exp}.${hex('ps', `wiki-grant:v1.${uid}.${exp}`)}`;
+  await withEnv({ WIKI_PASS_SECRET: 'ps', WIKI_ALLOWED_ACCOUNTS: 'gary,wilson' }, async () => {
+    const mw = createMiddlewareFromConfig({ gate: { type: 'freedom-account', allowEnv: 'WIKI_ALLOWED_ACCOUNTS' } });
+    assert.equal(await mw(req('https://t.wiki/x', { cookie: grant('wilson') })), undefined);
+    assert.equal((await mw(req('https://t.wiki/x', { cookie: grant('stranger') })))?.status, 403);
+    process.env.WIKI_ALLOWED_ACCOUNTS = '';
+    assert.equal((await mw(req('https://t.wiki/x', { cookie: grant('wilson') })))?.status, 403, 'emptied: nobody');
+  });
+  await withEnv({ WIKI_PASS_SECRET: 'ps' }, async () => {
+    const open = createMiddlewareFromConfig({ gate: { type: 'freedom-account' } });
+    assert.equal(await open(req('https://t.wiki/x', { cookie: grant('stranger') })), undefined, 'no allowEnv: every account');
+  });
+});

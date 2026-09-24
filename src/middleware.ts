@@ -200,7 +200,7 @@ export default createMiddleware();
 
 export { createPasswordGate, hasValidTicket } from './gate/passwordGate';
 export type { PasswordGateOptions } from './gate/passwordGate';
-export { createFreedomAccountGate, hasValidGrant, hourKey, mintPass, grantCookieValue, DEFAULT_OPEN_PATHS } from './gate/accountGate';
+export { createFreedomAccountGate, hasValidGrant, grantReader, hourKey, mintPass, grantCookieValue, parseAllowList, notAllowedPage, GRANT_COOKIE, DEFAULT_OPEN_PATHS } from './gate/accountGate';
 export { handleSignOut, isSignOut, justSignedOut, SIGN_OUT_PATH, GATE_COOKIES } from './gate/signOut';
 export type { AccountGateOptions } from './gate/accountGate';
 export { gateFromConfig, unlockParamFor } from './gate/fromConfig';

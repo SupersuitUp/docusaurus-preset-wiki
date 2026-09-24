@@ -5,6 +5,18 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.14.0 (2026-09-24)
+
+**The Freedom-account gate can admit a named list of accounts instead of every active one.** The Continental Works team wiki needed a sign-in that admits exactly two people, and the gate could only say yes to anyone with an active Freedom account.
+
+- **`createFreedomAccountGate({ allow })`**: a list of canonical account ids, or a function read per request so the ids can live in an env var. Absent: every active account, exactly as before. Present and empty or unset: nobody, because an allowlist fails CLOSED.
+- **A signed-in account not on the list meets a 403** (`notAllowedPage`) that names the account it is signed in as, since the likeliest cause is the wrong Google login, and offers Sign out. Its verdict is unauthorized, so a share link still serves it and the read beacon drops its pings. A grant bought with the bare hourly key names nobody and is never on a list.
+- **`gate.allowEnv` in wiki.config.json** names the env var holding the ids (comma or whitespace separated), so a config-driven wiki gets the same thing without an edit to its middleware. The ids stay in the deployment, never in the committed config.
+- `grantReader`, `parseAllowList`, `notAllowedPage` and `GRANT_COOKIE` are now exported from `./middleware`, so a wiki's serverless function can ask the same question the edge does.
+- **DETECTOR:** none needed; nothing changes for a wiki that does not set `allow` or `allowEnv`.
+- **REMEDY:** to restrict a wiki, `pnpm update @supersuit/docusaurus-preset-wiki`, set the env var on the project, and add `"allowEnv": "<NAME>"` to its `gate` block.
+- 5 new tests (380 total): listed accounts admitted, a stranger's 403 naming them with Sign out, the key grant refused, anonymous still the door, the function read per request, empty and unset lists failing closed, sign-out reachable while refused, the parser, and `allowEnv` from config both ways. Three of them fail with the list check removed.
+
 ## 1.13.0 (2026-09-23)
 
 **`wiki migrate` moved getfreedom-wiki, the largest copy-based wiki, and six things it got wrong on the way are fixed at the source.** One of them would have put a password door in front of a Freedom-account wiki.

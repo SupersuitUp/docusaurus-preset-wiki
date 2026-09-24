@@ -29,7 +29,9 @@
 
 import type { GateFn } from './types';
 import { createPasswordGate } from './passwordGate';
-import { createFreedomAccountGate } from './accountGate';
+import { createFreedomAccountGate, parseAllowList } from './accountGate';
+
+declare const process: { env: Record<string, string | undefined> };
 
 export type WikiGateType = 'password' | 'freedom-account' | 'none';
 
@@ -41,6 +43,8 @@ export interface WikiGateConfig {
   openPaths?: string;
   grantDays?: number;
   title?: string;
+  /** freedom-account only: the NAME of an env var holding the allowed account ids, comma-separated. */
+  allowEnv?: string;
 }
 
 const TYPES: WikiGateType[] = ['password', 'freedom-account', 'none'];
@@ -76,5 +80,7 @@ export function gateFromConfig(gate: WikiGateConfig | undefined): GateFn | undef
     openPaths,
     grantDays: gate?.grantDays,
     title: gate?.title,
+    // The ids live in the deployment's env, never in the committed config: read per request.
+    allow: gate?.allowEnv ? () => parseAllowList(process.env[gate.allowEnv as string]) : undefined,
   });
 }

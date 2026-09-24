@@ -44,7 +44,7 @@
 // EDGE-SAFE: Web Crypto only, no Node built-ins.
 
 import type { GateFn, GateVerdict } from './types';
-import { justSignedOut } from './signOut';
+import { justSignedOut, SIGN_OUT_PATH } from './signOut';
 
 export interface AccountGateOptions {
   /** The portal page that signs a reader in and bounces them back: `<signInUrl>?to=<url>`. */
@@ -59,6 +59,17 @@ export interface AccountGateOptions {
   openPaths?: RegExp;
   /** Shown on the door. Defaults to the request host. */
   title?: string;
+  /** Admit ONLY these account ids (canonical Freedom uids). A list, or a function read per
+   *  request so it can come from an env var. Absent means every active account is admitted,
+   *  as before. Present and empty admits nobody: an allowlist fails CLOSED, because the only
+   *  reason to set one is to keep people out. A signed-in account not on it meets a 403 that
+   *  names the account it is signed in as and offers Sign out. */
+  allow?: readonly string[] | (() => readonly string[] | undefined);
+}
+
+/** Parse a comma- or whitespace-separated list of account ids, e.g. an env var. */
+export function parseAllowList(raw: string | undefined | null): string[] {
+  return (raw ?? '').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 }
 
 declare const process: { env: Record<string, string | undefined> };
@@ -226,6 +237,48 @@ export function doorPage(title: string, signInHref: string, state: DoorState | b
 </html>`;
 }
 
+// The page a signed-in reader meets when their account is not on the wiki's allowlist. It names
+// who they are signed in as, because the likeliest cause is the wrong Google account, and it
+// offers Sign out, which clears this wiki's grant and returns them to the door.
+export function notAllowedPage(title: string, reader: string): string {
+  const t = escapeHtml(title);
+  const who = reader === 'key'
+    ? 'a shared link that names no account'
+    : `the account <code>${escapeHtml(reader)}</code>`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${t}</title>
+<meta name="robots" content="noindex" />
+<style>
+  :root { --ink: #1c1c1a; --paper: #fdfcf9; --card: #ffffff; --line: #e5e1d8; --accent: #2f6f5f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--paper); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.65; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  main { width: 100%; max-width: 32rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 2.25rem 2rem; }
+  .eyebrow { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin: 0 0 0.9rem; font-weight: 600; }
+  h1 { font-size: clamp(1.4rem, 5vw, 1.75rem); line-height: 1.25; margin: 0 0 1rem; }
+  p { margin: 0 0 1.1rem; color: #3c3a34; }
+  code { font-size: 0.9em; word-break: break-all; }
+  a.button { display: inline-block; font-size: 1rem; font-weight: 600; color: #fff; background: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 0.7rem 1.4rem; text-decoration: none; }
+  a.button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .actions { margin-top: 1.25rem; }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">${t}</p>
+  <h1>This site is for a named team only.</h1>
+  <p>You are signed in with ${who}, which is not on its list.</p>
+  <p>If you signed in with a different Google account than the one you were invited with, sign out and try the other one.</p>
+  <div class="actions"><a class="button" href="${SIGN_OUT_PATH}">Sign out</a></div>
+</main>
+</body>
+</html>`;
+}
+
 function htmlResponse(html: string, status: number): Response {
   return new Response(html, {
     status,
@@ -289,7 +342,14 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
     }
 
     const reader = await grantReader(request, secret, now);
-    if (reader !== null) return { authorized: true, reader };
+    if (reader !== null) {
+      if (opts.allow === undefined) return { authorized: true, reader };
+      const allowed = typeof opts.allow === 'function' ? opts.allow() ?? [] : opts.allow;
+      if (allowed.includes(reader)) return { authorized: true, reader };
+      // NOT authorized, so the share layer still serves a share link to this reader as it
+      // would to anyone, and the read beacon drops their pings.
+      return { authorized: false, response: htmlResponse(notAllowedPage(opts.title ?? url.host, reader), 403) };
+    }
 
     // The door, carrying the page they asked for with any spent credential stripped off.
     const back = cleanUrl(PASS_PARAM);

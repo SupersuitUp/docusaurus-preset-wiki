@@ -166,3 +166,49 @@ test('no secret fails OPEN and says so in a header, matching the family posture'
   assert.equal(res?.headers.get('x-middleware-next'), '1');
   assert.equal(res?.headers.get('x-wiki-gate'), 'gate-misconfigured-no-secret');
 });
+
+test('allow admits only the listed accounts; anyone else signed in meets a 403 naming them, with Sign out', async () => {
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const grant = async (uid: string) => `fw_gate=${await grantCookieValue(SECRET, uid, exp)}`;
+  const mw = gated({ allow: ['gary', 'wilson'] });
+  assert.equal(await mw(req('https://t.wiki/x', { cookie: await grant('gary') })), undefined, 'listed account admitted');
+  assert.equal(await mw(req('https://t.wiki/x', { cookie: await grant('wilson') })), undefined, 'second listed account admitted');
+  const res = await mw(req('https://t.wiki/x', { cookie: await grant('stranger') }));
+  assert.equal(res?.status, 403);
+  assert.equal(res!.headers.get('x-robots-tag'), 'noindex');
+  const html = await res!.text();
+  assert.match(html, /<code>stranger<\/code>/, 'names who they are signed in as');
+  assert.match(html, /href="\/sign-out"/, 'offers sign out');
+  // A grant the bare hourly key bought names nobody, so it is never on a list.
+  assert.equal((await mw(req('https://t.wiki/x', { cookie: await grant('key') })))?.status, 403);
+  // Anonymous is still the door, not the refusal.
+  assert.equal((await mw(req('https://t.wiki/x')))?.status, 401);
+});
+
+test('allow is read per request when it is a function, and an empty list admits nobody (fails closed)', async () => {
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const cookie = `fw_gate=${await grantCookieValue(SECRET, 'gary', exp)}`;
+  let list: string[] | undefined = ['gary'];
+  const mw = gated({ allow: () => list });
+  assert.equal(await mw(req('https://t.wiki/x', { cookie })), undefined);
+  list = [];
+  assert.equal((await mw(req('https://t.wiki/x', { cookie })))?.status, 403, 'empty list');
+  list = undefined;
+  assert.equal((await mw(req('https://t.wiki/x', { cookie })))?.status, 403, 'unset list');
+});
+
+test('a refused account is still served a share link and still reaches /sign-out', async () => {
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const cookie = `fw_gate=${await grantCookieValue(SECRET, 'stranger', exp)}`;
+  const mw = gated({ allow: ['gary'] });
+  const out = await mw(req('https://t.wiki/sign-out', { cookie }));
+  assert.equal(out?.status, 303);
+  assert.match(out!.headers.get('set-cookie') ?? '', /fw_gate=; Path=\/; Max-Age=0/);
+});
+
+test('parseAllowList splits on commas and whitespace and drops blanks', async () => {
+  const { parseAllowList } = await import('./accountGate');
+  assert.deepEqual(parseAllowList(' a, b ,,c\nd '), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(parseAllowList(undefined), []);
+  assert.deepEqual(parseAllowList(''), []);
+});

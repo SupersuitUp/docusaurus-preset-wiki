@@ -59,6 +59,11 @@ export interface AccountGateOptions {
   openPaths?: RegExp;
   /** Shown on the door. Defaults to the request host. */
   title?: string;
+  /** The door's own words. The default speaks to an early-access wiki; a wiki with a different
+   *  audience (a two-person team wiki, a client's wiki) says who it is for instead. Plain text,
+   *  escaped. Added 2026-09-24 after the Continental Works team wiki greeted its two owners as
+   *  members of "an early access program". */
+  door?: { heading?: string; body?: string };
   /** Admit ONLY these account ids (canonical Freedom uids). A list, or a function read per
    *  request so it can come from an env var. Absent means every active account is admitted,
    *  as before. Present and empty admits nobody: an allowlist fails CLOSED, because the only
@@ -195,10 +200,17 @@ export interface DoorState {
   expired?: boolean;
   /** The reader just signed out of this wiki. */
   signedOut?: boolean;
+  /** Overrides for the door's heading and line; see AccountGateOptions.door. */
+  heading?: string;
+  body?: string;
 }
 
+export const DEFAULT_DOOR_HEADING = 'This website is gated to those who are part of an early access program.';
+export const DEFAULT_DOOR_BODY = 'Sign in with the Google account you were invited with and you will land back on this page.';
+
 export function doorPage(title: string, signInHref: string, state: DoorState | boolean = {}): string {
-  const { expired = false, signedOut = false } = typeof state === 'boolean' ? { expired: state } : state;
+  const { expired = false, signedOut = false, heading = DEFAULT_DOOR_HEADING, body = DEFAULT_DOOR_BODY } =
+    typeof state === 'boolean' ? { expired: state } : state;
   const t = escapeHtml(title);
   return `<!doctype html>
 <html lang="en">
@@ -227,8 +239,8 @@ export function doorPage(title: string, signInHref: string, state: DoorState | b
 <body>
 <main>
   <p class="eyebrow">${t}</p>
-  <h1>This website is gated to those who are part of an early access program.</h1>
-  <p>Sign in with the Google account you were invited with and you will land back on this page.</p>
+  <h1>${escapeHtml(heading)}</h1>
+  <p>${escapeHtml(body)}</p>
   ${signedOut ? '<p class="note">You are signed out of this site. Signing in again is one tap unless you also signed out of the account itself.</p>' : ''}
   ${expired ? '<p class="error">That sign-in link expired. Sign in again and it will bring you straight here.</p>' : ''}
   <div class="actions"><a class="button" href="${escapeHtml(signInHref)}">Sign in</a></div>
@@ -358,7 +370,7 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
     const signInHref = `${signInUrl}?to=${encodeURIComponent(back.toString())}`;
     return {
       authorized: false,
-      response: htmlResponse(doorPage(opts.title ?? url.host, signInHref, { expired: passExpired, signedOut: justSignedOut(url) }), 401),
+      response: htmlResponse(doorPage(opts.title ?? url.host, signInHref, { expired: passExpired, signedOut: justSignedOut(url), ...opts.door }), 401),
     };
   };
   const sink = readSinkFor(signInUrl);

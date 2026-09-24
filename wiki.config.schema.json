@@ -136,6 +136,15 @@
           "type": "number",
           "description": "freedom-account only. How long one sign-in lasts. Default 7."
         },
+        "door": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "freedom-account only. The sign-in door's own words, for a wiki that is not early access (a team or client wiki). Plain text. Absent: the early-access wording.",
+          "properties": {
+            "heading": { "type": "string" },
+            "body": { "type": "string" }
+          }
+        },
         "title": {
           "type": "string",
           "description": "What the door calls the wiki. Defaults to the request host."

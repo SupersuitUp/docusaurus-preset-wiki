@@ -212,3 +212,12 @@ test('parseAllowList splits on commas and whitespace and drops blanks', async ()
   assert.deepEqual(parseAllowList(undefined), []);
   assert.deepEqual(parseAllowList(''), []);
 });
+
+test('a wiki can say who its door is for; the default still reads as early access', async () => {
+  const own = await (await gated({ door: { heading: 'The <team> wiki', body: 'Only the two of us.' } })(req('https://t.wiki/x')))!.text();
+  assert.match(own, /The &lt;team&gt; wiki/, 'the heading is escaped');
+  assert.match(own, /Only the two of us\./);
+  assert.doesNotMatch(own, /early access program/);
+  const dflt = await (await gated()(req('https://t.wiki/x')))!.text();
+  assert.match(dflt, /early access program/);
+});

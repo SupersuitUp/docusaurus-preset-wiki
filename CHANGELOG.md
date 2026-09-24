@@ -5,6 +5,16 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.15.0 (2026-09-24)
+
+**The account gate's door can say who the wiki is for.** The Continental Works team wiki, restricted to its two owners by 1.14.0's allowlist, greeted them as members of "an early access program" and told them to use "the Google account you were invited with", because the door's words were hard-coded for the early-access wikis.
+
+- **`createFreedomAccountGate({ door: { heading, body } })`** sets the door's heading and line, escaped as plain text. Absent, the early-access wording stays exactly as before (`DEFAULT_DOOR_HEADING`, `DEFAULT_DOOR_BODY` are exported).
+- **`gate.door` in wiki.config.json** does the same for a config-driven wiki; the schema documents it.
+- **DETECTOR:** a restricted or non-early-access wiki whose door reads "early access program".
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki` and pass `door` (or set `gate.door`).
+- 1 new test (381 total): a wiki's own words replace the default and are escaped, and the default still reads as early access.
+
 ## 1.14.0 (2026-09-24)
 
 **The Freedom-account gate can admit a named list of accounts instead of every active one.** The Continental Works team wiki needed a sign-in that admits exactly two people, and the gate could only say yes to anyone with an active Freedom account.

@@ -45,6 +45,8 @@ export interface WikiGateConfig {
   title?: string;
   /** freedom-account only: the NAME of an env var holding the allowed account ids, comma-separated. */
   allowEnv?: string;
+  /** freedom-account only: the door's own heading and line, for a wiki that is not early access. */
+  door?: { heading?: string; body?: string };
 }
 
 const TYPES: WikiGateType[] = ['password', 'freedom-account', 'none'];
@@ -82,5 +84,6 @@ export function gateFromConfig(gate: WikiGateConfig | undefined): GateFn | undef
     title: gate?.title,
     // The ids live in the deployment's env, never in the committed config: read per request.
     allow: gate?.allowEnv ? () => parseAllowList(process.env[gate.allowEnv as string]) : undefined,
+    door: gate?.door,
   });
 }

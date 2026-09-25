@@ -26,8 +26,9 @@
 // page, a changelog) are exempt by default, by ROUTE rather than by filename, so renaming a
 // file cannot silently acquire or lose an exemption.
 //
-//   node scripts/check-page-graphics.mjs          # check, exit 1 on a violation
-//   node scripts/check-page-graphics.mjs --json   # machine-readable
+//   wiki check page-graphics            # check, exit 1 on a violation
+//   wiki check page-graphics --json     # machine-readable
+//   wiki check page-graphics --accept   # write the baseline (it may only shrink)
 import {readFileSync, writeFileSync, readdirSync, statSync, existsSync} from 'fs';
 import {join, relative, resolve} from 'path';
 import { isDirectRun } from "./is-direct-run.mjs";
@@ -258,7 +259,7 @@ if (isDirectRun(import.meta.url)) {
     writeFileSync(BASELINE, JSON.stringify({
       _comment: 'Pages that predate the page-graphics gate. This list may only SHRINK: give a page '
         + 'a diagram or a hero and delete its line. Anything NOT in here must carry one or the build '
-        + 'fails. Regenerate with `node scripts/check-page-graphics.mjs --accept`.',
+        + 'fails. Regenerate with `wiki check page-graphics --accept`.',
       routes: bare,
     }, null, 2) + '\n');
     console.log(`[page-graphics] baseline: ${bare.length} route(s)`
@@ -292,5 +293,7 @@ if (isDirectRun(import.meta.url)) {
     for (const f of findings) console.error(`  ${f.file}  (${f.route})  ${f.reason}`);
     console.error(`\n  ${FIX}`);
   }
-  process.exit(adopted && findings.length ? 1 : 0);
+  // exitCode, never exit(): exit() drops whatever stdout has not drained, which cut --json off
+  // at 64KB through a pipe on a wiki with a long findings list.
+  process.exitCode = adopted && findings.length ? 1 : 0;
 }

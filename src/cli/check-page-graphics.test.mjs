@@ -100,7 +100,7 @@ test('giving a baselined page a graphic makes it pass on its own merits', () => 
 test('the gate is adopted by writing a baseline, not by being installed', async () => {
   const {readFileSync} = await import('node:fs');
   const src = readFileSync(new URL('./check-page-graphics.mjs', import.meta.url), 'utf8');
-  assert.match(src, /process\.exit\(adopted && findings\.length \? 1 : 0\)/,
+  assert.match(src, /process\.exitCode = adopted && findings\.length \? 1 : 0/,
     'no baseline means report and pass; a baseline means fail on anything new');
 });
 

@@ -41,7 +41,8 @@ const CHECKS = {
   middleware: () => node('check-middleware.mjs'),
   admonitions: () => node('check-admonitions.mjs'),
   'ascii-diagrams': () => node('check-ascii-diagrams.mjs'),
-  'page-graphics': () => node('check-page-graphics.mjs'),
+  // --accept and --json are how the gate is adopted and read, so they must reach it.
+  'page-graphics': () => node('check-page-graphics.mjs', ...rest.filter((a) => a.startsWith('--'))),
   voice: () => node('check-voice.mjs'),
   'retired-words': () => node('check-retired-words.mjs'),
   llms: () => node('llms-txt.mjs'),

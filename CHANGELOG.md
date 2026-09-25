@@ -5,6 +5,17 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.15.3 (2026-09-24)
+
+**`wiki check page-graphics --accept` now does what the gate tells you to run.** The first-run message says to freeze the baseline with that command, and the `wiki` dispatcher dropped every flag for this check, so it ran a plain check, wrote no baseline, and exited 0. Found adopting the gate on getfreedom.wiki. `--json` was dropped the same way.
+
+- **Flags reach the check:** `wiki check page-graphics --accept` writes `docs/.page-graphics-baseline.json`, and `--json` prints the report.
+- **`--json` is no longer cut off at 64KB through a pipe.** The script called `process.exit()` while stdout was still draining; on a wiki with a long findings list the output stopped mid-string and failed `JSON.parse`. It now sets `process.exitCode` and lets stdout drain.
+- The baseline file's comment and the script header name `wiki check page-graphics --accept` instead of a `scripts/` path no consumer has.
+- **DETECTOR:** `wiki check page-graphics --accept` on an un-baselined wiki printing the first-run report again instead of `baseline: N route(s)`.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`, then run it again.
+- 2 new tests (391 total), both red before the fix.
+
 ## 1.15.2 (2026-09-24)
 
 **A mermaid chart counts only when it carries an accessible name, the same rule an image embed already met.** 1.15.1 counted any ` ```mermaid ` fence, which made an untitled chart a graphic while an image with an empty alt was not one. A mermaid chart with no `accTitle` or `accDescr` renders an SVG with no accessible name, so for a screen-reader user the page is still bare.

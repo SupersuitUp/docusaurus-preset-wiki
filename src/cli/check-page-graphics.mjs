@@ -37,7 +37,11 @@ export const DEFAULT_EXEMPT = ['/reference/glossary', '/reference/voice-rules', 
   '/reference/graphic-style'];
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
-const FENCE = /^```/;
+// A fence opener: three or more backticks or tildes, then an info string. A fence closes only on
+// a run of the SAME character at least as long, with nothing after it, which is what lets a
+// four-backtick fence show a three-backtick mermaid block as an example without either one
+// being mistaken for the other.
+const FENCE_OPEN = /^(`{3,}|~{3,})\s*([^\s`]*)/;
 
 /** Frontmatter as a flat map of the scalar keys this gate reads. Not a YAML parser. */
 function frontmatter(body) {
@@ -51,15 +55,55 @@ function frontmatter(body) {
   return out;
 }
 
-/** The body with fenced code blocks removed, so documentation ABOUT embedding is not an embed. */
-function withoutFences(body) {
+/**
+ * The body split into prose and top-level fences. Fences are removed from the prose so that
+ * documentation ABOUT embedding is not an embed, but their info strings are kept, because one
+ * kind of fence is not documentation at all: a ```mermaid block IS the diagram, rendered by the
+ * theme. Stripping it unread is how ninety mermaid charts on one wiki read as "no graphic".
+ */
+function splitFences(body) {
   const kept = [];
-  let inFence = false;
+  const langs = [];
+  let open = null;
   for (const line of body.split(/\r?\n/)) {
-    if (FENCE.test(line.trim())) { inFence = !inFence; continue; }
-    if (!inFence) kept.push(line);
+    const t = line.trim();
+    if (open) {
+      const close = /^(`{3,}|~{3,})$/.exec(t);
+      if (close && close[1][0] === open[0] && close[1].length >= open.length) open = null;
+      continue;
+    }
+    const m = FENCE_OPEN.exec(t);
+    if (m) { open = m[1]; langs.push(m[2].toLowerCase()); continue; }
+    kept.push(line);
   }
-  return kept.join('\n');
+  // Inline code spans go too: `<svg>` written in a sentence is an example, not a drawing.
+  const prose = kept.join('\n').replace(/(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g, '');
+  return {prose, langs};
+}
+
+// Where a component may come from and still count as a drawing. Local components (@site, a
+// relative path) count loosely, as before; the package's own figures entry counts because its
+// exports ARE figures. Anything else (a theme component, a UI kit) does not, since Tabs and
+// Admonition are layout, not graphics.
+const FIGURE_SOURCES = [/^@site\//, /^\./, /^@supersuit\/docusaurus-preset-wiki\/figures$/];
+
+/** Local names bound by each qualifying import: default, named, and `X as Y` aliases. */
+function importedFigureNames(prose) {
+  const names = [];
+  for (const m of prose.matchAll(/^import\s+([\s\S]+?)\s+from\s+['"]([^'"]+)['"]/gm)) {
+    if (!FIGURE_SOURCES.some((rx) => rx.test(m[2]))) continue;
+    const clause = m[1];
+    const braces = /\{([\s\S]*)\}/.exec(clause);
+    const def = clause.replace(/\{[\s\S]*\}/, '').replace(/,/g, ' ').trim();
+    if (/^\w+$/.test(def)) names.push(def);
+    if (braces) {
+      for (const part of braces[1].split(',')) {
+        const local = part.trim().split(/\s+as\s+/).pop().trim();
+        if (/^\w+$/.test(local)) names.push(local);
+      }
+    }
+  }
+  return names;
 }
 
 /**
@@ -80,7 +124,7 @@ export function pageGraphic(body) {
 
   if (fm.image) return {has: true, exempt: false, kind: 'frontmatter-image'};
 
-  const prose = withoutFences(body.replace(FRONTMATTER, ''));
+  const {prose, langs} = splitFences(body.replace(FRONTMATTER, ''));
 
   // A markdown embed. The ALT IS THE POINT: the README asks for one sentence saying what the
   // reader now knows, and an embed with an empty alt gives a screen reader nothing at all, so
@@ -92,14 +136,20 @@ export function pageGraphic(body) {
       : {has: false, exempt: false, reason: 'empty-alt'};
   }
 
-  // An MDX page can draw with a component instead. Any local import that is then used as an
-  // element counts; this is deliberately loose, because the alternative is a list of component
-  // names that goes stale the first time somebody writes a new one.
-  const imported = [...prose.matchAll(/^import\s+(\w+)\s+from\s+['"](?:@site|\.)[^'"]+['"]/gm)]
-    .map((m) => m[1]);
+  // An MDX page can draw with a component instead. Any local import, or anything from the
+  // package's figures entry, that is then used as an element counts; this is deliberately loose
+  // about local names, because the alternative is a list of component names that goes stale the
+  // first time somebody writes a new one.
+  const imported = importedFigureNames(prose);
   if (imported.some((name) => new RegExp(`<${name}[\\s/>]`).test(prose))) {
     return {has: true, exempt: false, kind: 'component'};
   }
+
+  // An SVG written straight into the MDX, bare or wrapped in a <figure>.
+  if (/<svg[\s>]/i.test(prose)) return {has: true, exempt: false, kind: 'inline-svg'};
+
+  // A mermaid fence, which the theme renders as a diagram.
+  if (langs.includes('mermaid')) return {has: true, exempt: false, kind: 'mermaid'};
 
   return {has: false, exempt: false, reason: 'no-graphic'};
 }

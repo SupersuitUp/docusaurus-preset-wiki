@@ -103,3 +103,61 @@ test('the gate is adopted by writing a baseline, not by being installed', async 
   assert.match(src, /process\.exit\(adopted && findings\.length \? 1 : 0\)/,
     'no baseline means report and pass; a baseline means fail on anything new');
 });
+
+// THE FALSE POSITIVES found on supersuit.wiki on 2026-09-24. The gate only recognised a DEFAULT
+// import from @site or a relative path, so three real ways of drawing a page were reported as
+// "no graphic": the package's own house figure, an SVG written straight into the MDX, and a
+// mermaid chart (getfreedom.wiki carries about ninety, and fences were stripped before scanning).
+
+test("the package's own house figure counts, imported by name from the figures entry", () => {
+  const mdx = "---\ntitle: T\n---\n\nimport { Loop } from '@supersuit/docusaurus-preset-wiki/figures';\n\n# T\n\n<Loop steps={['a', 'b']} />\n";
+  const r = pageGraphic(mdx);
+  assert.equal(r.has, true);
+  assert.equal(r.kind, 'component');
+  const aliased = "import { wrapLabel, Loop as Cycle } from '@supersuit/docusaurus-preset-wiki/figures';\n\n<Cycle />\n";
+  assert.equal(pageGraphic(aliased).has, true, 'an aliased named import is the same figure');
+});
+
+test('a named import of a local component counts the same as a default one', () => {
+  assert.equal(pageGraphic("import { Flow } from '@site/src/components/Flow';\n\n<Flow />\n").has, true);
+});
+
+test('an importable figure that is never used as an element does not count', () => {
+  const mdx = "import { Loop, loopLabel } from '@supersuit/docusaurus-preset-wiki/figures';\n\n# T\n\nWords.\n";
+  assert.equal(pageGraphic(mdx).has, false);
+});
+
+test('a plain import of a non-figure component does not count', () => {
+  for (const imp of ["import Tabs from '@theme/Tabs';", "import { Tabs } from '@theme/Tabs';",
+    "import { Callout } from 'some-ui-kit';", "import Admonition from '@theme/Admonition';"]) {
+    const name = /import\s+\{?\s*(\w+)/.exec(imp)[1];
+    assert.equal(pageGraphic(`${imp}\n\n# T\n\n<${name}>words</${name}>\n`).has, false, imp);
+  }
+});
+
+test('an inline <svg> in an MDX page counts, bare or inside a <figure>', () => {
+  const bare = '# T\n\n<svg viewBox="0 0 10 10" role="img"><circle cx="5" cy="5" r="4" /></svg>\n';
+  assert.equal(pageGraphic(bare).has, true);
+  assert.equal(pageGraphic(bare).kind, 'inline-svg');
+  const fig = '# T\n\n<figure>\n  <svg viewBox="0 0 10 10"><rect width="10" height="10" /></svg>\n  <figcaption>What it argues</figcaption>\n</figure>\n';
+  assert.equal(pageGraphic(fig).has, true);
+});
+
+test('a mermaid fenced block counts, since the fence IS the diagram', () => {
+  const md = '# T\n\n```mermaid\nflowchart LR\n  A --> B\n```\n';
+  const r = pageGraphic(md);
+  assert.equal(r.has, true);
+  assert.equal(r.kind, 'mermaid');
+  assert.equal(pageGraphic('# T\n\n~~~mermaid\ngraph TD\n  A-->B\n~~~\n').has, true, 'tilde fences too');
+});
+
+test('documentation ABOUT embedding inside a code fence still does not count', () => {
+  const figure = "# T\n\n```mdx\nimport { Loop } from '@supersuit/docusaurus-preset-wiki/figures';\n\n<Loop />\n```\n";
+  assert.equal(pageGraphic(figure).has, false, 'a figure shown as code is not a figure');
+  const svg = '# T\n\n```html\n<figure><svg viewBox="0 0 1 1"></svg></figure>\n```\n';
+  assert.equal(pageGraphic(svg).has, false, 'an svg shown as code is not an svg');
+  const mermaid = '# T\n\n````md\n```mermaid\nflowchart LR\n  A --> B\n```\n````\n';
+  assert.equal(pageGraphic(mermaid).has, false, 'a mermaid block shown inside a longer fence is an example');
+  assert.equal(pageGraphic('# T\n\nWrite `<svg>` inline, or a ```` ```mermaid ```` fence.\n').has, false,
+    'inline code is not a drawing either');
+});

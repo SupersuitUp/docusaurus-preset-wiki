@@ -5,6 +5,17 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.15.1 (2026-09-24)
+
+**The page-graphics gate stops reporting real graphics as missing.** On supersuit.wiki it counted a component only when it was a DEFAULT import from `@site/...` or a relative path, so a page drawn with the package's own house figure (`import { Loop } from '@supersuit/docusaurus-preset-wiki/figures'`), or with an `<svg>` written straight into the MDX, read as "no graphic". Fences were stripped unread, so getfreedom.wiki's mermaid charts did not count either: 115 of its pages carry one and every one was reported bare.
+
+- **Now counts:** a named or aliased import (`{ Loop }`, `{ Loop as Cycle }`) from `@site`, a relative path, or `@supersuit/docusaurus-preset-wiki/figures`, used as an element; an inline `<svg>`, bare or inside a `<figure>` (kind `inline-svg`); a ` ```mermaid ` or `~~~mermaid` fence (kind `mermaid`).
+- **Still does not count:** anything inside a code fence, including a mermaid block shown inside a longer fence as an example (fences now close only on a run of the same character at least as long, per CommonMark); anything inside inline code; a figure imported but never rendered; a theme or UI-kit component such as `Tabs` or `Admonition`.
+- One page changes the other way: supersuit.wiki's graphic-style reference mentioned `![...](...)` in inline code and was being counted as an embed. It is default-exempt, so nothing fails.
+- **DETECTOR:** a page with a house figure, an inline SVG or a mermaid chart listed by `wiki check page-graphics`.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`, then `wiki check page-graphics --accept` on an adopted wiki to drop the routes that now pass from its baseline.
+- 7 new tests (388 total), each mutation-checked: removing the figures source, named-import parsing, the SVG branch, the mermaid branch, the source filter, fence stripping, nested-fence handling, inline-code stripping or the usage check fails at least one.
+
 ## 1.15.0 (2026-09-24)
 
 **The account gate's door can say who the wiki is for.** The Continental Works team wiki, restricted to its two owners by 1.14.0's allowlist, greeted them as members of "an early access program" and told them to use "the Google account you were invited with", because the door's words were hard-coded for the early-access wikis.

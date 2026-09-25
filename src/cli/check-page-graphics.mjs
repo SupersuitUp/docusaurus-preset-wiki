@@ -63,22 +63,23 @@ function frontmatter(body) {
  */
 function splitFences(body) {
   const kept = [];
-  const langs = [];
+  const fences = [];
   let open = null;
   for (const line of body.split(/\r?\n/)) {
     const t = line.trim();
     if (open) {
       const close = /^(`{3,}|~{3,})$/.exec(t);
       if (close && close[1][0] === open[0] && close[1].length >= open.length) open = null;
+      else fences[fences.length - 1].lines.push(line);
       continue;
     }
     const m = FENCE_OPEN.exec(t);
-    if (m) { open = m[1]; langs.push(m[2].toLowerCase()); continue; }
+    if (m) { open = m[1]; fences.push({lang: m[2].toLowerCase(), lines: []}); continue; }
     kept.push(line);
   }
   // Inline code spans go too: `<svg>` written in a sentence is an example, not a drawing.
   const prose = kept.join('\n').replace(/(`+)(?!`)[\s\S]*?[^`]\1(?!`)/g, '');
-  return {prose, langs};
+  return {prose, fences};
 }
 
 // Where a component may come from and still count as a drawing. Local components (@site, a
@@ -124,7 +125,7 @@ export function pageGraphic(body) {
 
   if (fm.image) return {has: true, exempt: false, kind: 'frontmatter-image'};
 
-  const {prose, langs} = splitFences(body.replace(FRONTMATTER, ''));
+  const {prose, fences} = splitFences(body.replace(FRONTMATTER, ''));
 
   // A markdown embed. The ALT IS THE POINT: the README asks for one sentence saying what the
   // reader now knows, and an embed with an empty alt gives a screen reader nothing at all, so
@@ -148,8 +149,16 @@ export function pageGraphic(body) {
   // An SVG written straight into the MDX, bare or wrapped in a <figure>.
   if (/<svg[\s>]/i.test(prose)) return {has: true, exempt: false, kind: 'inline-svg'};
 
-  // A mermaid fence, which the theme renders as a diagram.
-  if (langs.includes('mermaid')) return {has: true, exempt: false, kind: 'mermaid'};
+  // A mermaid fence, which the theme renders as a diagram. SAME RULE AS THE ALT: a chart with no
+  // accTitle or accDescr renders an SVG with no accessible name, so it is a graphic for the
+  // sighted reader only and does not satisfy the rule. The directive must open a line; the same
+  // words inside a node label are not it.
+  const charts = fences.filter((f) => f.lang === 'mermaid');
+  if (charts.length) {
+    return charts.some((f) => f.lines.some((l) => /^\s*acc(Title|Descr)\s*[:{]/.test(l)))
+      ? {has: true, exempt: false, kind: 'mermaid'}
+      : {has: false, exempt: false, reason: 'mermaid-without-title'};
+  }
 
   return {has: false, exempt: false, reason: 'no-graphic'};
 }
@@ -157,6 +166,9 @@ export function pageGraphic(body) {
 const FIX = 'draw it in code (copy sampleFlow() in diagrams/build.mjs, render, embed the SVG with a '
   + 'one-sentence alt) or render a hero (illustrations/scripts/render-hero.sh). If the page genuinely '
   + 'has no argument to draw, add `graphic: none` and a `graphic_reason` saying why.';
+
+const FIX_MERMAID = 'give the mermaid chart an `accTitle:` line (and ideally an `accDescr:`) saying what '
+  + 'the reader now knows, the same sentence an image alt would carry.';
 
 /**
  * Pages owed a graphic. `pages` is `[{route, body}]`; `exempt` is extra route globs; `baseline`
@@ -192,7 +204,8 @@ export function findPagesWithoutGraphics({pages, exempt = [], baseline = []}) {
     const g = pageGraphic(page.body);
     if (g.has || g.exempt) continue;
     if (grandfathered.has(page.route)) continue;
-    out.push({route: page.route, file: page.file, reason: g.reason, fix: FIX});
+    out.push({route: page.route, file: page.file, reason: g.reason,
+      fix: g.reason === 'mermaid-without-title' ? FIX_MERMAID : FIX});
   }
   return out;
 }

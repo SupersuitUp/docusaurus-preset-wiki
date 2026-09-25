@@ -144,11 +144,26 @@ test('an inline <svg> in an MDX page counts, bare or inside a <figure>', () => {
 });
 
 test('a mermaid fenced block counts, since the fence IS the diagram', () => {
-  const md = '# T\n\n```mermaid\nflowchart LR\n  A --> B\n```\n';
+  const md = '# T\n\n```mermaid\nflowchart LR\n  accTitle: A feeds B\n  A --> B\n```\n';
   const r = pageGraphic(md);
   assert.equal(r.has, true);
   assert.equal(r.kind, 'mermaid');
-  assert.equal(pageGraphic('# T\n\n~~~mermaid\ngraph TD\n  A-->B\n~~~\n').has, true, 'tilde fences too');
+  assert.equal(pageGraphic('# T\n\n~~~mermaid\ngraph TD\n  accDescr: A feeds B\n  A-->B\n~~~\n').has, true,
+    'tilde fences too, and accDescr names it as well as accTitle does');
+  assert.equal(pageGraphic('# T\n\n```mermaid\nflowchart LR\n  accDescr {\n    A feeds B\n  }\n  A --> B\n```\n').has, true,
+    'the block form of accDescr');
+});
+
+// A mermaid chart with no accTitle or accDescr renders an SVG with no accessible name, which is
+// the same thing as an image embed with an empty alt: a graphic for the sighted reader only.
+test('a mermaid block with no accTitle or accDescr does not count, like an empty alt', () => {
+  const r = pageGraphic('# T\n\n```mermaid\nflowchart LR\n  A --> B\n```\n');
+  assert.equal(r.has, false);
+  assert.equal(r.reason, 'mermaid-without-title');
+  assert.equal(pageGraphic('# T\n\n```mermaid\nflowchart LR\n  A["accTitle: not a directive"] --> B\n```\n').has, false,
+    'the words inside a node label are not the directive');
+  const [f] = findPagesWithoutGraphics({pages: [{route: '/concepts/m', body: '# M\n\n```mermaid\ngraph TD\n  A-->B\n```\n'}]});
+  assert.match(f.fix, /accTitle/, 'the finding says how to fix THIS case');
 });
 
 test('documentation ABOUT embedding inside a code fence still does not count', () => {

@@ -5,6 +5,17 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.15.2 (2026-09-24)
+
+**A mermaid chart counts only when it carries an accessible name, the same rule an image embed already met.** 1.15.1 counted any ` ```mermaid ` fence, which made an untitled chart a graphic while an image with an empty alt was not one. A mermaid chart with no `accTitle` or `accDescr` renders an SVG with no accessible name, so for a screen-reader user the page is still bare.
+
+- **Counts:** a mermaid fence with an `accTitle:`, an `accDescr:`, or an `accDescr { ... }` block on a line of its own. The same words inside a node label do not count.
+- **Does not count:** an untitled mermaid fence, reported as `mermaid-without-title`, with a fix line saying to add `accTitle:`.
+- Measured on getfreedom.wiki: 74 pages carry a titled chart and pass; 92 carry only untitled charts and are owed a title.
+- **DETECTOR:** `wiki check page-graphics` listing a page as `mermaid-without-title`.
+- **REMEDY:** add an `accTitle:` line (the sentence an alt would carry) to the chart, or `--accept` to grandfather it on a wiki adopting the gate.
+- 1 new test (389 total); requiring the title, anchoring it to a line, the block form of `accDescr` and the case-specific fix each fail a test when removed.
+
 ## 1.15.1 (2026-09-24)
 
 **The page-graphics gate stops reporting real graphics as missing.** On supersuit.wiki it counted a component only when it was a DEFAULT import from `@site/...` or a relative path, so a page drawn with the package's own house figure (`import { Loop } from '@supersuit/docusaurus-preset-wiki/figures'`), or with an `<svg>` written straight into the MDX, read as "no graphic". Fences were stripped unread, so getfreedom.wiki's mermaid charts did not count either: 115 of its pages carry one and every one was reported bare.

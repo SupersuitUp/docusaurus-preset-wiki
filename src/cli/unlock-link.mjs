@@ -65,7 +65,10 @@ export function siteUrl(root = ROOT) {
  * supersuit.wiki locked because of it. So `follow()` below carries cookies AND follows, which is
  * what a browser does, and this predicate then only has to recognise the end of that walk.
  */
-export function opens({ status, setsCookie = false }) {
+export function opens({ status, setsCookie = false, offPage = false }) {
+  // A gate that redirects to its sign-in page answers 200 there. Landing anywhere but the page
+  // asked for is a door, whatever the status (faithwalk, 2026-09-30: /login read as "open").
+  if (offPage) return false;
   if (status === 200) return true;
   return status >= 300 && status < 400 && setsCookie;
 }
@@ -255,7 +258,8 @@ if (invokedDirectly) {
         url = new URL(loc, url).toString();
         continue;
       }
-      return { status: r.status, setsCookie, jar };
+      const offPage = new URL(url).pathname.replace(/\/$/, "") !== new URL(start).pathname.replace(/\/$/, "");
+      return { status: r.status, setsCookie, offPage, jar };
     }
     return { status: 0, setsCookie, jar };
   };

@@ -261,3 +261,9 @@ test("unlockParamFor follows gate.type and the declared value wins", () => {
   assert.equal(unlockParamFor({ type: "none" }), null);
   assert.equal(unlockParamFor({ type: "freedom-account", unlockParam: "pass" }), "pass");
 });
+
+test("a redirect that lands on a sign-in page is not an open page, even at 200", () => {
+  assert.equal(opens({ status: 200, offPage: true }), false);
+  assert.equal(opens({ status: 302, setsCookie: true, offPage: true }), false);
+  assert.equal(opens({ status: 200, offPage: false }), true);
+});

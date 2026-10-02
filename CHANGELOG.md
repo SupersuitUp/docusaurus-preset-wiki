@@ -5,6 +5,13 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.16.2 (2026-10-01)
+
+**The Ascent door's ribbon runs edge to edge.** The thread across the card's top now continues past the card to the screen's right edge, so every strand meets an edge of the screen at both ends (Gary: "Strand should always end to end of page too"). The door also refuses vertical overscroll, so Safari's rubber band cannot pull the card away from a ribbon drawn to the viewport.
+
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`.
+- The rise test now asserts the thread's right edge reaches the viewport.
+
 ## 1.16.1 (2026-10-01)
 
 **The Ascent door loses its teal frame and its ribbon now rises.** Same night as 1.16.0, from Gary on his phone: "let's drop the teal container" and "I don't love the stripes not representing context flowing from bottom to up". The flat stripe band across the card was decoration; it is now the end of one ribbon (`riseHtml()`): six strands fan in at the bottom of the screen (teal and aqua from the side, the rest through the bottom edge, never crossing), close into one ribbon, climb the card's left side and turn through a quarter circle, teal outside, into the thread across the card's top. Static, no script. The not-allowed page carries it too. The neutral door is untouched.

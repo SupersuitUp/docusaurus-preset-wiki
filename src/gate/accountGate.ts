@@ -243,11 +243,12 @@ const ASCENT_STYLE = `
     --paper: color-mix(in srgb, var(--cream) 42%, white); --mute: color-mix(in srgb, var(--ink) 64%, var(--cream)); color-scheme: light; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
-  html { background: var(--paper); }
+  html { background: var(--paper); overscroll-behavior-y: none; }
   body { background: var(--paper); color: var(--ink); font: 1.0625rem/1.55 -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: -0.022em; -webkit-font-smoothing: antialiased; min-height: 100vh; min-height: 100svh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; overflow-x: hidden; }
   main { position: relative; width: 100%; max-width: 32rem; background: #fff; border-radius: 22px; padding: 2.25rem 2rem; margin-top: 12px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent); }
-  /* THE RIBBON (see riseHtml): the thread across the top of the card is the end of it. */
-  main::before { content: ''; position: absolute; top: -12px; left: 0; right: 0; height: 12px;
+  /* THE RIBBON (see riseHtml): the thread across the top of the card is the end of it, and it runs
+     on past the card to the screen's right edge, as every strand runs edge to edge. */
+  main::before { content: ''; position: absolute; top: -12px; left: 0; right: calc((100% - 100vw) / 2); height: 12px;
     background: linear-gradient(180deg, #105971 0 2px, #69B1B5 2px 4px, #EED79E 4px 6px, #E9A23B 6px 8px, #DD562F 8px 10px, #DB371F 10px 12px); }
   .rise { position: absolute; left: -24px; top: 12px; width: 12px; height: calc(50vh + 50% - 12px - 140px); pointer-events: none;
     background: linear-gradient(90deg, var(--teal) 0 2px, var(--aqua) 2px 4px, var(--sand) 4px 6px, var(--mustard) 6px 8px, var(--burnt) 8px 10px, var(--tomato) 10px 12px); }

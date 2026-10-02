@@ -249,3 +249,27 @@ test('with no theme the door keeps the neutral look', async () => {
   const { notAllowedPage } = await import('./accountGate');
   assert.doesNotMatch(notAllowedPage('t.wiki', 'a@b'), /Fraunces/);
 });
+
+test('the ascent door has no teal frame, and its ribbon rises from a fan into the card', async () => {
+  const door = await (await gated({ door: { theme: 'ascent' } })(req('https://t.wiki/x')))!.text();
+  assert.doesNotMatch(door, /box-shadow: 0 0 0 120px/, 'the poster frame is gone');
+  assert.doesNotMatch(door, /html \{ background: var\(--teal\)/);
+  const { riseHtml } = await import('./accountGate');
+  assert.ok(door.includes(riseHtml()), 'the ribbon is on the door');
+  const turn = [...riseHtml().matchAll(/<path d="M([\d.]+) 24 A([\d.]+) [\d.]+ 0 0 1 24 ([\d.]+)" stroke="var\(--(\w+)\)"/g)];
+  assert.deepEqual(turn.map((m) => m[4]), ['teal', 'aqua', 'sand', 'mustard', 'burnt', 'tomato']);
+  // Each strand climbs at x = 1 + 2i and lands on thread row 1 + 2i: a quarter circle, no gap.
+  turn.forEach((m, i) => {
+    assert.equal(+m[1], 1 + 2 * i);
+    assert.equal(+m[3], 1 + 2 * i);
+    assert.equal(+m[2], 24 - +m[1]);
+  });
+  const fan = [...riseHtml().matchAll(/<path d="M([-\d.]+) ([\d.]+) C/g)];
+  assert.ok(+fan[0][1] < 0 && +fan[1][1] < 0, 'teal and aqua enter from the side');
+  assert.ok(fan.slice(2).every((m) => +m[2] > 140), 'the rest enter through the bottom edge');
+  const xs = fan.slice(2).map((m) => +m[1]);
+  assert.deepEqual([...xs].sort((a, b) => a - b), xs, 'bottom entries in ribbon order, so nothing crosses');
+  const no = (await import('./accountGate')).notAllowedPage('t.wiki', 'a@b', 'ascent');
+  assert.ok(no.includes(riseHtml()));
+  assert.doesNotMatch(await (await gated()(req('https://t.wiki/x')))!.text(), /class="rise"/, 'neutral door untouched');
+});

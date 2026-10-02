@@ -72,3 +72,10 @@ export function brandCss(b: Brand): string {
   if (b.dark) css += `html[data-theme='dark']{${vars(b.dark)}}`;
   return css;
 }
+
+/** The head tag a wiki NOT built through defineWikiConfig adds to its own config's `headTags`,
+ *  so every family wiki reads brand.json through this one implementation. Empty with no file. */
+export function brandHeadTags(root: string) {
+  const b = readBrand(root);
+  return b ? [{ tagName: 'style', attributes: { 'data-brand': 'universe' }, innerHTML: brandCss(b) }] : [];
+}

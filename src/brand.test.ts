@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { defineWikiConfig } from './define-config';
-import { brandCss, shade } from './brand';
+import { brandCss, shade, brandHeadTags } from './brand';
 
 const wiki = {
   title: 'T', tagline: 'tag', url: 'https://t.wiki', organizationName: 'o', projectName: 'p',
@@ -50,4 +50,10 @@ test('a malformed brand.json fails the build by name rather than rendering half 
 test('shades move toward black and white', () => {
   assert.equal(shade('#808080', -0.5), '#404040');
   assert.equal(shade('#808080', 0.5), '#c0c0c0');
+});
+
+test('brandHeadTags is the same tag for a wiki outside defineWikiConfig, and nothing without a file', () => {
+  assert.deepEqual(brandHeadTags(site()), []);
+  const d = site(HA);
+  assert.deepEqual(brandHeadTags(d), [style(defineWikiConfig(wiki, { siteDir: d }))]);
 });

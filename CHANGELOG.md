@@ -5,6 +5,14 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.17.0 (2026-10-02)
+
+**A wiki can wear its owner's brand universe: `brand.json` at the site root.** freedom#163. Gary: "Personal wikis default to hyper agentic age" (the AI wikis first). A wiki builds from its own repo and cannot read the universe on its owner's machine, so Freedom emits the colors (`freedom-brand.mjs emit --universe <universe> --surface wiki`, from the roles the universe declares in `identity.surfaces`) into `brand.json`, and `defineWikiConfig` injects them as `html[data-theme=light|dark]` variables: ground, text, accent and seven accent shades, one step more specific than a wiki's own `custom.css`. `theme-color` follows the ground. A wiki not built through `defineWikiConfig` adds `brandHeadTags(siteDir)` from `@supersuit/docusaurus-preset-wiki/brand` to its own `headTags`, so every family wiki reads the file through one implementation.
+
+- **DETECTOR:** a wiki whose owner has a declared brand and whose `<head>` has no `style[data-brand=universe]`.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`, then write `brand.json` with the emit command. No `brand.json`, no change, so this release moves nothing by itself.
+- 6 new tests (402 total): no file changes nothing, both themes land, no dark set leaves dark alone, a malformed file fails the build by name, shades, `brandHeadTags` is the same tag.
+
 ## 1.16.3 (2026-10-01)
 
 **No card on the Ascent door: the ribbon is the frame.** The ribbon climbs the left side and runs across the top, so the white card inside it said the same thing twice (Gary: "The white square in middle feels redundant because of the nice stripe frame"). The words now sit on the paper inside the ribbon.

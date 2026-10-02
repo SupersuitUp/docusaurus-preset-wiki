@@ -245,7 +245,10 @@ const ASCENT_STYLE = `
   html, body { margin: 0; padding: 0; }
   html { background: var(--paper); overscroll-behavior-y: none; }
   body { background: var(--paper); color: var(--ink); font: 1.0625rem/1.55 -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: -0.022em; -webkit-font-smoothing: antialiased; min-height: 100vh; min-height: 100svh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; overflow-x: hidden; }
-  main { position: relative; width: 100%; max-width: 32rem; background: #fff; border-radius: 22px; padding: 2.25rem 2rem; margin-top: 12px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent); }
+  /* NO CARD. The ribbon is the frame: it climbs the left side and runs across the top, so a white
+     card inside it said the same thing twice (Gary, 2026-10-01: "The white square in middle feels
+     redundant because of the nice stripe frame"). The words sit on the paper. */
+  main { position: relative; width: 100%; max-width: 32rem; padding: 1.9rem 0 1.5rem 2rem; margin-top: 12px; }
   /* THE RIBBON (see riseHtml): the thread across the top of the card is the end of it, and it runs
      on past the card to the screen's right edge, as every strand runs edge to edge. */
   main::before { content: ''; position: absolute; top: -12px; left: 0; right: calc((100% - 100vw) / 2); height: 12px;

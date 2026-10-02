@@ -254,6 +254,7 @@ test('the ascent door has no teal frame, and its ribbon rises from a fan into th
   const door = await (await gated({ door: { theme: 'ascent' } })(req('https://t.wiki/x')))!.text();
   assert.doesNotMatch(door, /box-shadow: 0 0 0 120px/, 'the poster frame is gone');
   assert.doesNotMatch(door, /html \{ background: var\(--teal\)/);
+  assert.doesNotMatch(door, /\n  main \{[^}]*background/, 'no card: the ribbon is the frame');
   assert.match(door, /main::before \{[^}]*right: calc\(\(100% - 100vw\) \/ 2\)/, 'the thread runs to the screen edge');
   const { riseHtml } = await import('./accountGate');
   assert.ok(door.includes(riseHtml()), 'the ribbon is on the door');

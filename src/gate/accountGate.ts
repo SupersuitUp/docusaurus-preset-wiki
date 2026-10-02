@@ -63,7 +63,7 @@ export interface AccountGateOptions {
    *  audience (a two-person team wiki, a client's wiki) says who it is for instead. Plain text,
    *  escaped. Added 2026-09-24 after the Continental Works team wiki greeted its two owners as
    *  members of "an early access program". */
-  door?: { heading?: string; body?: string };
+  door?: { heading?: string; body?: string; theme?: DoorTheme };
   /** Admit ONLY these account ids (canonical Freedom uids). A list, or a function read per
    *  request so it can come from an env var. Absent means every active account is admitted,
    *  as before. Present and empty admits nobody: an allowlist fails CLOSED, because the only
@@ -203,23 +203,22 @@ export interface DoorState {
   /** Overrides for the door's heading and line; see AccountGateOptions.door. */
   heading?: string;
   body?: string;
+  /** The door's look; see DoorTheme. */
+  theme?: DoorTheme;
 }
 
-export const DEFAULT_DOOR_HEADING = 'This website is gated to those who are part of an early access program.';
-export const DEFAULT_DOOR_BODY = 'Sign in with the Google account you were invited with and you will land back on this page.';
+// THE DOOR'S LOOK. `neutral` is the family default: a plain card that says nothing about who runs
+// the wiki. `ascent` is the Continental Works look (continental-works-universe
+// canon/craft/the-ascent.json, the system continentalworks.ai is built on): a fixed teal poster
+// border with a rounded window onto paper, the six-stripe ribbon teal to tomato across the card,
+// Fraunces at full softness, and a tomato action set large because cream on tomato clears 3:1
+// only as large text. A wiki opts in with `gate.door.theme`. Added 2026-10-01 when getfreedom.wiki
+// took the Ascent and its door was still the neutral card (Gary: "The authentication redirect
+// page and login page need update too").
+export type DoorTheme = 'neutral' | 'ascent';
+export const DOOR_THEMES: readonly DoorTheme[] = ['neutral', 'ascent'];
 
-export function doorPage(title: string, signInHref: string, state: DoorState | boolean = {}): string {
-  const { expired = false, signedOut = false, heading = DEFAULT_DOOR_HEADING, body = DEFAULT_DOOR_BODY } =
-    typeof state === 'boolean' ? { expired: state } : state;
-  const t = escapeHtml(title);
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${t}</title>
-<meta name="robots" content="noindex" />
-<style>
+const NEUTRAL_STYLE = `
   :root { --ink: #1c1c1a; --paper: #fdfcf9; --card: #ffffff; --muted: #6d6a63; --line: #e5e1d8; --accent: #2f6f5f; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -228,14 +227,70 @@ export function doorPage(title: string, signInHref: string, state: DoorState | b
   .eyebrow { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin: 0 0 0.9rem; font-weight: 600; }
   h1 { font-size: clamp(1.4rem, 5vw, 1.75rem); line-height: 1.25; margin: 0 0 1rem; }
   p { margin: 0 0 1.1rem; color: #3c3a34; }
+  code { font-size: 0.9em; word-break: break-all; }
   a.button { display: inline-block; font-size: 1rem; font-weight: 600; color: #fff; background: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 0.7rem 1.4rem; text-decoration: none; }
   a.button:hover { filter: brightness(1.08); }
   a.button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .error { color: #a3543c; font-size: 0.95rem; margin: 0 0 1rem; }
   .note { color: var(--accent); font-size: 0.95rem; margin: 0 0 1rem; }
   .actions { margin-top: 1.25rem; }
-</style>
-</head>
+`;
+
+// The eleven Ascent tokens are restated as literals because this runs at the edge with no file
+// access; the hexes are the-ascent.json's and the stripe order is its `stripes.order`.
+const ASCENT_STYLE = `
+  :root { --tomato: #DB371F; --deepred: #D63219; --burnt: #DD562F; --mustard: #E9A23B; --sand: #EED79E; --cream: #F6E7C5; --aqua: #69B1B5; --teal: #105971; --ink: #1E1B19;
+    --paper: color-mix(in srgb, var(--cream) 42%, white); --mute: color-mix(in srgb, var(--ink) 64%, var(--cream)); --fw: 10px; color-scheme: light; }
+  @media (min-width: 768px) { :root { --fw: 16px; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { background: var(--teal); }
+  body { background: var(--paper); color: var(--ink); font: 1.0625rem/1.55 -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: -0.022em; -webkit-font-smoothing: antialiased; min-height: 100vh; min-height: 100svh; display: flex; align-items: center; justify-content: center; padding: calc(var(--fw) + 1.5rem); }
+  body::after { content: ''; position: fixed; inset: var(--fw); border-radius: 22px; box-shadow: 0 0 0 120px var(--teal); pointer-events: none; }
+  main { position: relative; width: 100%; max-width: 32rem; background: #fff; border-radius: 22px; padding: calc(2.25rem + 12px) 2rem 2.25rem; overflow: hidden; box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent); }
+  main::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 12px;
+    background: linear-gradient(180deg, #105971 0 2px, #69B1B5 2px 4px, #EED79E 4px 6px, #E9A23B 6px 8px, #DD562F 8px 10px, #DB371F 10px 12px); }
+  .eyebrow { font-family: 'Fraunces', Georgia, serif; font-weight: 900; font-variation-settings: 'SOFT' 100, 'WONK' 1; letter-spacing: -0.01em; font-size: 1.1rem; color: var(--teal); margin: 0 0 1rem; }
+  h1 { font-family: 'Fraunces', Georgia, serif; font-weight: 800; font-variation-settings: 'SOFT' 100, 'WONK' 1; letter-spacing: -0.012em; font-size: clamp(1.5rem, 5.5vw, 1.95rem); line-height: 1.15; margin: 0 0 1rem; }
+  p { margin: 0 0 1.1rem; color: var(--ink); }
+  code { font-size: 0.9em; word-break: break-all; background: color-mix(in srgb, var(--sand) 45%, white); padding: 0.1em 0.35em; border-radius: 6px; }
+  a.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; font-family: 'Fraunces', Georgia, serif; font-size: 1.1875rem; font-weight: 700; font-variation-settings: 'SOFT' 100, 'WONK' 1; color: var(--cream); background: var(--tomato); border-radius: 980px; padding: 0.6rem 1.6rem; text-decoration: none; transition: transform .08s; }
+  a.button:hover, a.button:active { background: var(--deepred); }
+  a.button:active { transform: scale(.985); }
+  a.button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .error { color: var(--ink); font-size: 0.95rem; margin: 0 0 1rem; padding-left: 0.75rem; border-left: 4px solid var(--tomato); }
+  .note { color: var(--teal); font-size: 0.95rem; margin: 0 0 1rem; }
+  .actions { margin-top: 1.25rem; }
+  @media (prefers-reduced-motion: reduce) { a.button { transition: none; } }
+`;
+
+function doorHead(t: string, theme: DoorTheme = 'neutral'): string {
+  const fonts = theme === 'ascent'
+    ? `<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,700..900,0..100,0..1&display=swap" />
+<meta name="theme-color" content="#105971" />
+`
+    : '';
+  return `<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>${t}</title>
+<meta name="robots" content="noindex" />
+${fonts}<style>${theme === 'ascent' ? ASCENT_STYLE : NEUTRAL_STYLE}</style>
+</head>`;
+}
+
+export const DEFAULT_DOOR_HEADING = 'This website is gated to those who are part of an early access program.';
+export const DEFAULT_DOOR_BODY = 'Sign in with the Google account you were invited with and you will land back on this page.';
+
+export function doorPage(title: string, signInHref: string, state: DoorState | boolean = {}): string {
+  const { expired = false, signedOut = false, heading = DEFAULT_DOOR_HEADING, body = DEFAULT_DOOR_BODY, theme = 'neutral' } =
+    typeof state === 'boolean' ? { expired: state } : state;
+  const t = escapeHtml(title);
+  return `<!doctype html>
+<html lang="en">
+${doorHead(t, theme)}
 <body>
 <main>
   <p class="eyebrow">${t}</p>
@@ -252,33 +307,14 @@ export function doorPage(title: string, signInHref: string, state: DoorState | b
 // The page a signed-in reader meets when their account is not on the wiki's allowlist. It names
 // who they are signed in as, because the likeliest cause is the wrong Google account, and it
 // offers Sign out, which clears this wiki's grant and returns them to the door.
-export function notAllowedPage(title: string, reader: string): string {
+export function notAllowedPage(title: string, reader: string, theme: DoorTheme = 'neutral'): string {
   const t = escapeHtml(title);
   const who = reader === 'key'
     ? 'a shared link that names no account'
     : `the account <code>${escapeHtml(reader)}</code>`;
   return `<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${t}</title>
-<meta name="robots" content="noindex" />
-<style>
-  :root { --ink: #1c1c1a; --paper: #fdfcf9; --card: #ffffff; --line: #e5e1d8; --accent: #2f6f5f; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
-  body { background: var(--paper); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.65; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
-  main { width: 100%; max-width: 32rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 2.25rem 2rem; }
-  .eyebrow { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin: 0 0 0.9rem; font-weight: 600; }
-  h1 { font-size: clamp(1.4rem, 5vw, 1.75rem); line-height: 1.25; margin: 0 0 1rem; }
-  p { margin: 0 0 1.1rem; color: #3c3a34; }
-  code { font-size: 0.9em; word-break: break-all; }
-  a.button { display: inline-block; font-size: 1rem; font-weight: 600; color: #fff; background: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 0.7rem 1.4rem; text-decoration: none; }
-  a.button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .actions { margin-top: 1.25rem; }
-</style>
-</head>
+${doorHead(t, theme)}
 <body>
 <main>
   <p class="eyebrow">${t}</p>
@@ -360,7 +396,7 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
       if (allowed.includes(reader)) return { authorized: true, reader };
       // NOT authorized, so the share layer still serves a share link to this reader as it
       // would to anyone, and the read beacon drops their pings.
-      return { authorized: false, response: htmlResponse(notAllowedPage(opts.title ?? url.host, reader), 403) };
+      return { authorized: false, response: htmlResponse(notAllowedPage(opts.title ?? url.host, reader, opts.door?.theme), 403) };
     }
 
     // The door, carrying the page they asked for with any spent credential stripped off.

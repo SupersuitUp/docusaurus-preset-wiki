@@ -221,3 +221,31 @@ test('a wiki can say who its door is for; the default still reads as early acces
   const dflt = await (await gated()(req('https://t.wiki/x')))!.text();
   assert.match(dflt, /early access program/);
 });
+
+test('door theme "ascent" dresses the door and the not-allowed page in the Continental Works look', async () => {
+  const door = await (await gated({ door: { theme: 'ascent' } })(req('https://t.wiki/x')))!.text();
+  assert.match(door, /family=Fraunces/, 'loads the display face');
+  assert.match(door, /#105971/i, 'teal poster border');
+  assert.match(door, /#DB371F/i, 'tomato primary action');
+  assert.match(door, /#F6E7C5/i, 'cream text on the action');
+  assert.doesNotMatch(door, /#2f6f5f/i, 'none of the neutral door accent survives');
+  // The ribbon runs teal to tomato, never another order.
+  const order = ['#105971', '#69B1B5', '#EED79E', '#E9A23B', '#DD562F', '#DB371F'].map((h) => door.toUpperCase().indexOf(`${h} `));
+  assert.ok(order.every((i) => i > -1), 'all six stripes are drawn');
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'stripes in ribbon order');
+  assert.match(door, /early access program/, 'theme changes the look, not the words');
+
+  const { notAllowedPage } = await import('./accountGate');
+  const no = notAllowedPage('t.wiki', 'someone@x', 'ascent');
+  assert.match(no, /family=Fraunces/);
+  assert.match(no, /#105971/i);
+  assert.doesNotMatch(no, /#2f6f5f/i);
+});
+
+test('with no theme the door keeps the neutral look', async () => {
+  const dflt = await (await gated()(req('https://t.wiki/x')))!.text();
+  assert.match(dflt, /#2f6f5f/i);
+  assert.doesNotMatch(dflt, /Fraunces/);
+  const { notAllowedPage } = await import('./accountGate');
+  assert.doesNotMatch(notAllowedPage('t.wiki', 'a@b'), /Fraunces/);
+});

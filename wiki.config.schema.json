@@ -139,10 +139,14 @@
         "door": {
           "type": "object",
           "additionalProperties": false,
-          "description": "freedom-account only. The sign-in door's own words, for a wiki that is not early access (a team or client wiki). Plain text. Absent: the early-access wording.",
+          "description": "freedom-account only. The sign-in door's own words, for a wiki that is not early access (a team or client wiki), and its look. Plain text. Absent: the early-access wording on the neutral card.",
           "properties": {
             "heading": { "type": "string" },
-            "body": { "type": "string" }
+            "body": { "type": "string" },
+            "theme": {
+              "enum": ["neutral", "ascent"],
+              "description": "The door's look. neutral (default): a plain card naming no one. ascent: the Continental Works look (teal poster border, six-stripe ribbon, Fraunces, tomato action), for a wiki that wears the Ascent."
+            }
           }
         },
         "title": {

@@ -29,7 +29,7 @@
 
 import type { GateFn } from './types';
 import { createPasswordGate } from './passwordGate';
-import { createFreedomAccountGate, parseAllowList } from './accountGate';
+import { createFreedomAccountGate, parseAllowList, DOOR_THEMES, type DoorTheme } from './accountGate';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -46,7 +46,7 @@ export interface WikiGateConfig {
   /** freedom-account only: the NAME of an env var holding the allowed account ids, comma-separated. */
   allowEnv?: string;
   /** freedom-account only: the door's own heading and line, for a wiki that is not early access. */
-  door?: { heading?: string; body?: string };
+  door?: { heading?: string; body?: string; theme?: DoorTheme };
 }
 
 const TYPES: WikiGateType[] = ['password', 'freedom-account', 'none'];
@@ -71,6 +71,9 @@ export function gateFromConfig(gate: WikiGateConfig | undefined): GateFn | undef
       machinePaths: gate?.machinePaths,
       title: gate?.title,
     });
+  }
+  if (gate?.door?.theme !== undefined && !DOOR_THEMES.includes(gate.door.theme)) {
+    throw new Error(`wiki.config.json gate.door.theme "${String(gate.door.theme)}" is not one of ${DOOR_THEMES.join(', ')}`);
   }
   let openPaths: RegExp | undefined;
   if (gate?.openPaths !== undefined) {

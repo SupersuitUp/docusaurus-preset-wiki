@@ -99,3 +99,11 @@ test('allowEnv names the env var holding the allowed account ids, read per reque
     assert.equal(await open(req('https://t.wiki/x', { cookie: grant('stranger') })), undefined, 'no allowEnv: every account');
   });
 });
+
+test('gate.door.theme reaches the door, and an unknown theme is refused at build', async () => {
+  await withEnv({ WIKI_GATE_SECRET: 'gs' }, async () => {
+    const mw = createMiddlewareFromConfig({ gate: { type: 'freedom-account', door: { theme: 'ascent' } } });
+    assert.match(await (await mw(req('https://t.wiki/x')))!.text(), /family=Fraunces/);
+    assert.throws(() => gateFromConfig({ type: 'freedom-account', door: { theme: 'neon' as never } }), /door\.theme/);
+  });
+});

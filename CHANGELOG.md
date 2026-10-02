@@ -5,6 +5,15 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.16.0 (2026-10-01)
+
+**The sign-in door can wear the Continental Works look.** `gate.door.theme: "ascent"` dresses the account gate's door and its not-allowed page in the Ascent (continental-works-universe `canon/craft/the-ascent.json`, the system continentalworks.ai is built on): a fixed teal poster border with a rounded window onto paper, the six-stripe ribbon teal to tomato across the top of the card, Fraunces at full softness for the wiki's name and the heading, and a tomato Sign in pill set large. getfreedom.wiki took the Ascent the same day and its door was still the neutral card.
+
+- **Default unchanged:** no theme, or `"neutral"`, is the plain card it always was. The theme changes the look only, never the words.
+- **Refused at build:** a `door.theme` that is not `neutral` or `ascent` throws from `gateFromConfig`, and the schema enumerates the two.
+- **ADOPT:** add `"theme": "ascent"` under `gate.door` in `wiki.config.json`, then `pnpm update @supersuit/docusaurus-preset-wiki`.
+- 3 new tests (395 total); the two Ascent tests fail with the theme removed.
+
 ## 1.15.3 (2026-09-24)
 
 **`wiki check page-graphics --accept` now does what the gate tells you to run.** The first-run message says to freeze the baseline with that command, and the `wiki` dispatcher dropped every flag for this check, so it ran a plain check, wrote no baseline, and exited 0. Found adopting the gate on getfreedom.wiki. `--json` was dropped the same way.

@@ -5,6 +5,13 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.16.3 (2026-10-01)
+
+**No card on the Ascent door: the ribbon is the frame.** The ribbon climbs the left side and runs across the top, so the white card inside it said the same thing twice (Gary: "The white square in middle feels redundant because of the nice stripe frame"). The words now sit on the paper inside the ribbon.
+
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`.
+- The rise test refuses a background on the door's main.
+
 ## 1.16.2 (2026-10-01)
 
 **The Ascent door's ribbon runs edge to edge.** The thread across the card's top now continues past the card to the screen's right edge, so every strand meets an edge of the screen at both ends (Gary: "Strand should always end to end of page too"). The door also refuses vertical overscroll, so Safari's rubber band cannot pull the card away from a ribbon drawn to the viewport.

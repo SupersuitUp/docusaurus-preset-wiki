@@ -240,16 +240,20 @@ const NEUTRAL_STYLE = `
 // access; the hexes are the-ascent.json's and the stripe order is its `stripes.order`.
 const ASCENT_STYLE = `
   :root { --tomato: #DB371F; --deepred: #D63219; --burnt: #DD562F; --mustard: #E9A23B; --sand: #EED79E; --cream: #F6E7C5; --aqua: #69B1B5; --teal: #105971; --ink: #1E1B19;
-    --paper: color-mix(in srgb, var(--cream) 42%, white); --mute: color-mix(in srgb, var(--ink) 64%, var(--cream)); --fw: 10px; color-scheme: light; }
-  @media (min-width: 768px) { :root { --fw: 16px; } }
+    --paper: color-mix(in srgb, var(--cream) 42%, white); --mute: color-mix(in srgb, var(--ink) 64%, var(--cream)); color-scheme: light; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
-  html { background: var(--teal); }
-  body { background: var(--paper); color: var(--ink); font: 1.0625rem/1.55 -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: -0.022em; -webkit-font-smoothing: antialiased; min-height: 100vh; min-height: 100svh; display: flex; align-items: center; justify-content: center; padding: calc(var(--fw) + 1.5rem); }
-  body::after { content: ''; position: fixed; inset: var(--fw); border-radius: 22px; box-shadow: 0 0 0 120px var(--teal); pointer-events: none; }
-  main { position: relative; width: 100%; max-width: 32rem; background: #fff; border-radius: 22px; padding: calc(2.25rem + 12px) 2rem 2.25rem; overflow: hidden; box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent); }
-  main::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 12px;
+  html { background: var(--paper); }
+  body { background: var(--paper); color: var(--ink); font: 1.0625rem/1.55 -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: -0.022em; -webkit-font-smoothing: antialiased; min-height: 100vh; min-height: 100svh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; overflow-x: hidden; }
+  main { position: relative; width: 100%; max-width: 32rem; background: #fff; border-radius: 22px; padding: 2.25rem 2rem; margin-top: 12px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent); }
+  /* THE RIBBON (see riseHtml): the thread across the top of the card is the end of it. */
+  main::before { content: ''; position: absolute; top: -12px; left: 0; right: 0; height: 12px;
     background: linear-gradient(180deg, #105971 0 2px, #69B1B5 2px 4px, #EED79E 4px 6px, #E9A23B 6px 8px, #DD562F 8px 10px, #DB371F 10px 12px); }
+  .rise { position: absolute; left: -24px; top: 12px; width: 12px; height: calc(50vh + 50% - 12px - 140px); pointer-events: none;
+    background: linear-gradient(90deg, var(--teal) 0 2px, var(--aqua) 2px 4px, var(--sand) 4px 6px, var(--mustard) 6px 8px, var(--burnt) 8px 10px, var(--tomato) 10px 12px); }
+  .rise svg { position: absolute; overflow: visible; fill: none; stroke-width: 2.2; }
+  .rise .turn { left: 0; top: -24px; width: 24px; height: 24px; }
+  .rise .fan { left: -30px; top: 100%; width: 80px; height: 140px; }
   .eyebrow { font-family: 'Fraunces', Georgia, serif; font-weight: 900; font-variation-settings: 'SOFT' 100, 'WONK' 1; letter-spacing: -0.01em; font-size: 1.1rem; color: var(--teal); margin: 0 0 1rem; }
   h1 { font-family: 'Fraunces', Georgia, serif; font-weight: 800; font-variation-settings: 'SOFT' 100, 'WONK' 1; letter-spacing: -0.012em; font-size: clamp(1.5rem, 5.5vw, 1.95rem); line-height: 1.15; margin: 0 0 1rem; }
   p { margin: 0 0 1.1rem; color: var(--ink); }
@@ -263,6 +267,33 @@ const ASCENT_STYLE = `
   .actions { margin-top: 1.25rem; }
   @media (prefers-reduced-motion: reduce) { a.button { transition: none; } }
 `;
+
+// THE RIBBON ON AN ASCENT DOOR. Context arrives scattered and is united into the thing you are
+// opening (continental-works-universe canon/craft/the-ascent.json, stripes.journey), read bottom to
+// top: six strands fan in at the bottom of the screen (teal and aqua from the left side, the rest
+// through the bottom edge, never crossing), close into one ribbon, climb the card's left side, and
+// turn through a quarter circle, teal outside, into the thread across the card's top, teal on top.
+// Static, so it needs no script: the climb is a CSS gradient sized to reach the viewport's bottom
+// from a centred card (50vh + half the card), the turn and the fan are fixed-size SVG at its ends.
+// Replaced a flat stripe band and the fixed teal frame on 2026-10-01 (Gary: "let's drop the teal
+// container"; "I don't love the stripes not representing context flowing from bottom to up").
+const RIBBON = ['teal', 'aqua', 'sand', 'mustard', 'burnt', 'tomato'];
+export function riseHtml(): string {
+  // The turn: strand i runs up at x = 1 + 2i and ends on thread row y = 1 + 2i at the card's edge.
+  const turn = RIBBON.map((c, i) => {
+    const a = 1 + 2 * i, r = 23 - 2 * i;
+    return `<path d="M${a} 24 A${r} ${r} 0 0 1 24 ${a}" stroke="var(--${c})"/>`;
+  }).join('');
+  // The fan: from the climb's foot (x = 31 + 2i) out to its entry.
+  const fan = RIBBON.map((c, i) => {
+    const tx = 31 + 2 * i;
+    const d = i < 2
+      ? `M-2000 ${i === 0 ? 70 : 100} C${tx} ${i === 0 ? 70 : 100} ${tx} 30 ${tx} 0`
+      : (() => { const ex = Math.round((31 + 2 * i * 1.7 + (i - 2) * 5) * 10) / 10; return `M${ex} 146 C${ex} 100 ${tx} 60 ${tx} 0`; })();
+    return `<path d="${d}" stroke="var(--${c})"/>`;
+  }).join('');
+  return `<div class="rise" aria-hidden="true"><svg class="turn" viewBox="0 0 24 24">${turn}</svg><svg class="fan" viewBox="0 0 80 140">${fan}</svg></div>`;
+}
 
 function doorHead(t: string, theme: DoorTheme = 'neutral'): string {
   const fonts = theme === 'ascent'
@@ -293,6 +324,7 @@ export function doorPage(title: string, signInHref: string, state: DoorState | b
 ${doorHead(t, theme)}
 <body>
 <main>
+  ${theme === 'ascent' ? riseHtml() : ''}
   <p class="eyebrow">${t}</p>
   <h1>${escapeHtml(heading)}</h1>
   <p>${escapeHtml(body)}</p>
@@ -317,6 +349,7 @@ export function notAllowedPage(title: string, reader: string, theme: DoorTheme =
 ${doorHead(t, theme)}
 <body>
 <main>
+  ${theme === 'ascent' ? riseHtml() : ''}
   <p class="eyebrow">${t}</p>
   <h1>This site is for a named team only.</h1>
   <p>You are signed in with ${who}, which is not on its list.</p>

@@ -5,6 +5,14 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.16.1 (2026-10-01)
+
+**The Ascent door loses its teal frame and its ribbon now rises.** Same night as 1.16.0, from Gary on his phone: "let's drop the teal container" and "I don't love the stripes not representing context flowing from bottom to up". The flat stripe band across the card was decoration; it is now the end of one ribbon (`riseHtml()`): six strands fan in at the bottom of the screen (teal and aqua from the side, the rest through the bottom edge, never crossing), close into one ribbon, climb the card's left side and turn through a quarter circle, teal outside, into the thread across the card's top. Static, no script. The not-allowed page carries it too. The neutral door is untouched.
+
+- **DETECTOR:** an Ascent door with a teal border round the window, or a flat stripe band inside the top of the card.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`.
+- 1 new test (396 total): no frame, turn radii landing each strand on its thread row, side and bottom entries in ribbon order.
+
 ## 1.16.0 (2026-10-01)
 
 **The sign-in door can wear the Continental Works look.** `gate.door.theme: "ascent"` dresses the account gate's door and its not-allowed page in the Ascent (continental-works-universe `canon/craft/the-ascent.json`, the system continentalworks.ai is built on): a fixed teal poster border with a rounded window onto paper, the six-stripe ribbon teal to tomato across the top of the card, Fraunces at full softness for the wiki's name and the heading, and a tomato Sign in pill set large. getfreedom.wiki took the Ascent the same day and its door was still the neutral card.

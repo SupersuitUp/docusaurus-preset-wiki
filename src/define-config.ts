@@ -4,6 +4,7 @@ import { themes as prismThemes } from 'prism-react-renderer';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 import type { WikiConfig } from './config';
+import { readBrand, brandCss } from './brand';
 
 type Overrides = Partial<Omit<Config, 'themeConfig'>> & {
   themeConfig?: Record<string, unknown>;
@@ -49,6 +50,8 @@ export function defineWikiConfig(wiki: WikiConfig, overrides: Overrides = {}): C
   // Docusaurus reads the config from the site root, so that is where `static/` is.
   const root = siteDir ?? process.cwd();
   const hasStatic = (rel: string) => fs.existsSync(path.join(root, 'static', rel));
+  // The owner's brand universe, emitted into brand.json (src/brand.ts). Absent, nothing changes.
+  const brand = readBrand(root);
 
   const base: Config = {
     title: wiki.title,
@@ -104,7 +107,8 @@ export function defineWikiConfig(wiki: WikiConfig, overrides: Overrides = {}): C
         ? [{ tagName: 'link', attributes: { rel: 'icon', type: 'image/png', sizes: '512x512', href: '/img/icon-512.png' } }]
         : []),
       { tagName: 'link', attributes: { rel: 'manifest', href: '/manifest.webmanifest' } },
-      { tagName: 'meta', attributes: { name: 'theme-color', content: wiki.og?.bg ?? '#ffffff' } },
+      { tagName: 'meta', attributes: { name: 'theme-color', content: brand?.ground ?? wiki.og?.bg ?? '#ffffff' } },
+      ...(brand ? [{ tagName: 'style', attributes: { 'data-brand': 'universe' }, innerHTML: brandCss(brand) }] : []),
       ...(wiki.noindex
         ? [{ tagName: 'meta', attributes: { name: 'robots', content: 'noindex, nofollow' } }]
         : []),

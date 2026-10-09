@@ -5,6 +5,14 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.17.1 (2026-10-09)
+
+**The house eyes line judges the faces the camera sees, not the people it stands behind.** `wiki hero` read every render back against "every person's eyes are open and clearly visible unless plainly asleep", and the org's cartridge puts the camera behind the operator, so his eyes are never in frame. Three correct appliedai.wiki heroes (superproject, the plan map, the defensible plan) were refused in every round on 2026-10-09 and published only by a person overruling the gate. The line now asks that every face seen from the front, three-quarter front or full profile has its visible eyes open, still calls a closed, blank or hair-hidden eye there a DEFECT, and says a person seen from behind or over the shoulder is never a DEFECT under it.
+
+- **DETECTOR:** a hero refused with an eyes DEFECT whose note says the person is seen from behind or from the side.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki` in the wiki, or rebuild the local checkout (`npm run build`) when rendering through it.
+- 1 new test (403 total): the eyes line names the faces it judges, still refuses a closed eye on them, and exempts a person seen from behind. The pixel-level proof is `tests/readback` in `SupersuitUp/wiki-style-packs`: the three refused heroes now come back with no DEFECT, and a strip shot from in front of the laptop is still refused, by that pack's camera line.
+
 ## 1.17.0 (2026-10-02)
 
 **A wiki can wear its owner's brand universe: `brand.json` at the site root.** freedom#163. Gary: "Personal wikis default to hyper agentic age" (the AI wikis first). A wiki builds from its own repo and cannot read the universe on its owner's machine, so Freedom emits the colors (`freedom-brand.mjs emit --universe <universe> --surface wiki`, from the roles the universe declares in `identity.surfaces`) into `brand.json`, and `defineWikiConfig` injects them as `html[data-theme=light|dark]` variables: ground, text, accent and seven accent shades, one step more specific than a wiki's own `custom.css`. `theme-color` follows the ground. A wiki not built through `defineWikiConfig` adds `brandHeadTags(siteDir)` from `@supersuit/docusaurus-preset-wiki/brand` to its own `headTags`, so every family wiki reads the file through one implementation.

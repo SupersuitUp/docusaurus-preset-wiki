@@ -27,10 +27,17 @@ const MAX_STYLE_REFS = 3;
 /** The word is banned in scene text family-wide: it reads as a tabletop and the model draws one. */
 const BANNED_SCENE_WORD = /\bsurface/i;
 
-/** The five assertions every wiki hero is read back against, before the pack's and the wiki's. */
+/**
+ * The five assertions every wiki hero is read back against, before the pack's and the wiki's.
+ *
+ * The eyes line names the faces it judges. It exists to catch a closed or blank eye on a face the
+ * viewer sees; worded as "every person's eyes are open and clearly visible" it also refused every
+ * person the camera stood behind, which is the framing the org's cartridge requires, and three
+ * correct heroes were refused in every round on 2026-10-09 (tests/readback in wiki-style-packs).
+ */
 export function wikiGate({ layout, beats }) {
   return [
-    "every person's eyes are open and clearly visible unless plainly asleep",
+    'every face the camera sees from the front, three-quarter front or full profile has its visible eyes open and clearly drawn unless the person is plainly asleep; an eye there drawn closed, blank or hidden under hair or glare is a DEFECT. A person seen from behind or over the shoulder (the back of the head, or a lost profile showing at most a cheek and the edge of an eye) is not required to show their eyes and is never a DEFECT under this line',
     'no lettering beyond the declared strings; invented words on folders, screens or tags are a DEFECT',
     'a screen faces the person using it, never the viewer',
     `exactly ${beats} panels, one per beat, no more and no fewer`,

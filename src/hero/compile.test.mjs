@@ -5,6 +5,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { compileHero, wikiGate } from './compile.mjs';
 
+/** The house eyes line, whatever its wording, so the dedupe tests below follow it. */
+const EYES = wikiGate({ layout: 'grid', beats: 4 })[0];
+
 /** A loaded pack the way loadPack hands it back: manifest plus `dir`, refs on disk. */
 function pack(overrides = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'pack-'));
@@ -15,7 +18,7 @@ function pack(overrides = {}) {
     palette: { ground: ['#EFE6D2', '#F5F1E9'], fill: ['#8FB0CE'], line: ['#3B382F'] },
     styleLine: 'warm editorial illustration, soft painterly line',
     rejectedPoles: ['comic-book', 'neon', '3D/CGI/Pixar'],
-    gate: ['muted natural palette on a warm cream ground', 'every person\'s eyes are open and clearly visible unless plainly asleep'],
+    gate: ['muted natural palette on a warm cream ground', EYES],
     maxElements: 6, textPolicy: 'furniture', dir, ...overrides,
   };
   for (const r of new Set([p.anchor, ...p.refs])) if (r) writeFileSync(join(dir, r), '');
@@ -164,13 +167,27 @@ test('negatives: one "no <pole>" per rejected pole, in pack order', () => {
 });
 
 test('the gate is the five wiki defaults, then the pack gate, then the config gate, deduplicated by trimmed equality', () => {
-  const p = pack({ gate: ['muted natural palette on a warm cream ground', '  every person\'s eyes are open and clearly visible unless plainly asleep  ', 'shared line'] });
+  const p = pack({ gate: ['muted natural palette on a warm cream ground', `  ${EYES}  `, 'shared line'] });
   const c = config({ gate: ['shared line', 'the smart glasses match the prop photos'] });
   const { gate } = compileHero(page({ pack: p, config: c }));
   assert.equal(gate.length, 5 + 2 + 1);
   assert.deepEqual(gate.slice(0, 5), wikiGate({ layout: 'grid', beats: 4 }));
-  assert.equal(gate[0], 'every person\'s eyes are open and clearly visible unless plainly asleep');
+  assert.equal(gate[0], EYES);
   assert.deepEqual(gate.slice(5), ['muted natural palette on a warm cream ground', 'shared line', 'the smart glasses match the prop photos']);
+});
+
+// 2026-10-09: three correct heroes (superproject, the plan map, the defensible plan) were refused
+// in every round because this line read "every person's eyes are open and clearly visible", and
+// the cartridge that painted them puts the camera behind the operator, so his eyes were never in
+// frame. The line exists to catch a closed or blank eye on a face the viewer sees, which it still
+// does; a person seen from behind has no eyes in the picture to get wrong.
+test('the eyes line refuses a closed eye on a face the camera sees, and never a person seen from behind', () => {
+  assert.match(EYES, /front, three-quarter front or full profile/);
+  assert.match(EYES, /drawn closed, blank or hidden under hair or glare is a DEFECT/);
+  assert.match(EYES, /seen from behind or over the shoulder/);
+  assert.match(EYES, /never a DEFECT under this line/);
+  assert.doesNotMatch(EYES, /every person's eyes are open/, 'the old wording asked for eyes the camera cannot see');
+  assert.deepEqual(wikiGate({ layout: 'row', beats: 3 })[0], EYES, 'one eyes line for every layout');
 });
 
 test('the wiki defaults name the declared strings, the panel count and the layout', () => {

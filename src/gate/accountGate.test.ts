@@ -226,11 +226,18 @@ test('door theme "ascent" dresses the door and the not-allowed page in the Conti
   const door = await (await gated({ door: { theme: 'ascent' } })(req('https://t.wiki/x')))!.text();
   assert.match(door, /family=Fraunces/, 'loads the display face');
   assert.match(door, /#105971/i, 'teal poster border');
-  assert.match(door, /#DB371F/i, 'tomato primary action');
+  assert.match(door, /--mulberry: #A12A5E;/, 'mulberry primary action');
+  assert.match(door, /a\.button \{[^}]*background: var\(--mulberry\)/, 'the action is drawn in mulberry');
+  assert.match(door, /--deepmulberry: #8A2451;/, 'deep mulberry for hover and press');
+  assert.match(door, /a\.button:hover, a\.button:active \{ background: var\(--deepmulberry\); \}/);
+  assert.match(door, /\.error \{[^}]*border-left: 4px solid var\(--mulberry\)/, 'the error bar is mulberry');
+  // The sixth stripe was tomato #DB371F (hover #D63219) until 2026-10-12, and raspberry #C22D55 for
+  // an hour that evening. None of the three hexes, and neither old token name, may come back.
+  for (const gone of [/#DB371F/i, /#D63219/i, /#C22D55/i, /tomato/i, /deepred/i]) assert.doesNotMatch(door, gone, `the old sixth stripe is gone: ${gone}`);
   assert.match(door, /#F6E7C5/i, 'cream text on the action');
   assert.doesNotMatch(door, /#2f6f5f/i, 'none of the neutral door accent survives');
-  // The ribbon runs teal to tomato, never another order.
-  const order = ['#105971', '#69B1B5', '#EED79E', '#E9A23B', '#DD562F', '#DB371F'].map((h) => door.toUpperCase().indexOf(`${h} `));
+  // The ribbon runs teal to mulberry, never another order.
+  const order = ['#105971', '#69B1B5', '#EED79E', '#E9A23B', '#DD562F', '#A12A5E'].map((h) => door.toUpperCase().indexOf(`${h} `));
   assert.ok(order.every((i) => i > -1), 'all six stripes are drawn');
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'stripes in ribbon order');
   assert.match(door, /early access program/, 'theme changes the look, not the words');
@@ -240,6 +247,8 @@ test('door theme "ascent" dresses the door and the not-allowed page in the Conti
   assert.match(no, /family=Fraunces/);
   assert.match(no, /#105971/i);
   assert.doesNotMatch(no, /#2f6f5f/i);
+  assert.match(no, /--mulberry: #A12A5E;/);
+  for (const gone of [/#DB371F/i, /#D63219/i, /#C22D55/i, /tomato/i, /deepred/i]) assert.doesNotMatch(no, gone);
 });
 
 test('with no theme the door keeps the neutral look', async () => {
@@ -259,7 +268,7 @@ test('the ascent door has no teal frame, and its ribbon rises from a fan into th
   const { riseHtml } = await import('./accountGate');
   assert.ok(door.includes(riseHtml()), 'the ribbon is on the door');
   const turn = [...riseHtml().matchAll(/<path d="M([\d.]+) 24 A([\d.]+) [\d.]+ 0 0 1 24 ([\d.]+)" stroke="var\(--(\w+)\)"/g)];
-  assert.deepEqual(turn.map((m) => m[4]), ['teal', 'aqua', 'sand', 'mustard', 'burnt', 'tomato']);
+  assert.deepEqual(turn.map((m) => m[4]), ['teal', 'aqua', 'sand', 'mustard', 'burnt', 'mulberry']);
   // Each strand climbs at x = 1 + 2i and lands on thread row 1 + 2i: a quarter circle, no gap.
   turn.forEach((m, i) => {
     assert.equal(+m[1], 1 + 2 * i);

@@ -5,6 +5,14 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.17.2 (2026-10-12)
+
+**The Ascent door's sixth stripe is mulberry.** On 2026-10-12 Gary changed the sixth stripe of the Continental Works ribbon from tomato `#DB371F` to mulberry `#A12A5E`, its hover and press colour from deep red `#D63219` to deep mulberry `#8A2451`, and the token names with them ("Update color name and update Abu and propagate across all surfaces"; source of truth: continental-works-universe `canon/craft/the-ascent.json`). The sign-in door with `gate.door.theme: "ascent"` types its own copy of that palette because it runs at the edge with no file access, so it still drew the old one: the Sign in button, its hover, the error bar, the last stripe of the thread across the top, and the sixth strand of the climbing ribbon, its turn and its fan. All of them are mulberry now, and the door's own custom properties are `--mulberry` and `--deepmulberry` (the ribbon's order names end `mulberry`). Nothing outside the door's HTML reads those names, so there is no alias. The button keeps its size; cream on mulberry is about 5.7:1, so the size is no longer what makes it readable, and the comment that said so is corrected. The neutral door is untouched.
+
+- **DETECTOR:** a wiki with `gate.door.theme: "ascent"` whose door has a red-orange Sign in button, or `curl -s <wiki>/ | grep -ci 'DB371F'` answering anything but 0.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki` in the wiki and redeploy. A wiki on the neutral door needs nothing.
+- No new tests (403 total); the two Ascent door tests now pin `--mulberry: #A12A5E` on the button and the error bar, `--deepmulberry: #8A2451` on hover and press, the six stripes ending `#A12A5E`, the order names ending `mulberry`, and refuse `#DB371F`, `#D63219`, `#C22D55` (raspberry, which the stripe was for an hour), `tomato` and `deepred` on both the door and the not-allowed page.
+
 ## 1.17.1 (2026-10-09)
 
 **The house eyes line judges the faces the camera sees, not the people it stands behind.** `wiki hero` read every render back against "every person's eyes are open and clearly visible unless plainly asleep", and the org's cartridge puts the camera behind the operator, so his eyes are never in frame. Three correct appliedai.wiki heroes (superproject, the plan map, the defensible plan) were refused in every round on 2026-10-09 and published only by a person overruling the gate. The line now asks that every face seen from the front, three-quarter front or full profile has its visible eyes open, still calls a closed, blank or hair-hidden eye there a DEFECT, and says a person seen from behind or over the shoulder is never a DEFECT under it.

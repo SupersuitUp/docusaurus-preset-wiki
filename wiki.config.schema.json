@@ -145,7 +145,7 @@
             "body": { "type": "string" },
             "theme": {
               "enum": ["neutral", "ascent"],
-              "description": "The door's look. neutral (default): a plain card naming no one. ascent: the Continental Works look (teal poster border, six-stripe ribbon, Fraunces, tomato action), for a wiki that wears the Ascent."
+              "description": "The door's look. neutral (default): a plain card naming no one. ascent: the Continental Works look (teal poster border, six-stripe ribbon, Fraunces, mulberry action), for a wiki that wears the Ascent."
             }
           }
         },

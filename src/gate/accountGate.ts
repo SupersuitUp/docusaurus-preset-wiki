@@ -210,9 +210,12 @@ export interface DoorState {
 // THE DOOR'S LOOK. `neutral` is the family default: a plain card that says nothing about who runs
 // the wiki. `ascent` is the Continental Works look (continental-works-universe
 // canon/craft/the-ascent.json, the system continentalworks.ai is built on): a fixed teal poster
-// border with a rounded window onto paper, the six-stripe ribbon teal to tomato across the card,
-// Fraunces at full softness, and a tomato action set large because cream on tomato clears 3:1
-// only as large text. A wiki opts in with `gate.door.theme`. Added 2026-10-01 when getfreedom.wiki
+// border with a rounded window onto paper, the six-stripe ribbon teal to mulberry across the card,
+// Fraunces at full softness, and a mulberry action set large. The size is the display face's, no
+// longer a contrast requirement: cream #F6E7C5 on mulberry #A12A5E is about 6:1, which clears body
+// text too (the action was tomato #DB371F until 2026-10-12, where cream cleared 3:1 only as large
+// text). The sixth stripe was renamed with its colour that day (Gary: "Update color name and
+// update Abu and propagate across all surfaces"). A wiki opts in with `gate.door.theme`. Added 2026-10-01 when getfreedom.wiki
 // took the Ascent and its door was still the neutral card (Gary: "The authentication redirect
 // page and login page need update too").
 export type DoorTheme = 'neutral' | 'ascent';
@@ -239,7 +242,7 @@ const NEUTRAL_STYLE = `
 // The eleven Ascent tokens are restated as literals because this runs at the edge with no file
 // access; the hexes are the-ascent.json's and the stripe order is its `stripes.order`.
 const ASCENT_STYLE = `
-  :root { --tomato: #DB371F; --deepred: #D63219; --burnt: #DD562F; --mustard: #E9A23B; --sand: #EED79E; --cream: #F6E7C5; --aqua: #69B1B5; --teal: #105971; --ink: #1E1B19;
+  :root { --mulberry: #A12A5E; --deepmulberry: #8A2451; --burnt: #DD562F; --mustard: #E9A23B; --sand: #EED79E; --cream: #F6E7C5; --aqua: #69B1B5; --teal: #105971; --ink: #1E1B19;
     --paper: color-mix(in srgb, var(--cream) 42%, white); --mute: color-mix(in srgb, var(--ink) 64%, var(--cream)); color-scheme: light; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -252,9 +255,9 @@ const ASCENT_STYLE = `
   /* THE RIBBON (see riseHtml): the thread across the top of the card is the end of it, and it runs
      on past the card to the screen's right edge, as every strand runs edge to edge. */
   main::before { content: ''; position: absolute; top: -12px; left: 0; right: calc((100% - 100vw) / 2); height: 12px;
-    background: linear-gradient(180deg, #105971 0 2px, #69B1B5 2px 4px, #EED79E 4px 6px, #E9A23B 6px 8px, #DD562F 8px 10px, #DB371F 10px 12px); }
+    background: linear-gradient(180deg, #105971 0 2px, #69B1B5 2px 4px, #EED79E 4px 6px, #E9A23B 6px 8px, #DD562F 8px 10px, #A12A5E 10px 12px); }
   .rise { position: absolute; left: -24px; top: 12px; width: 12px; height: calc(50vh + 50% - 12px - 140px); pointer-events: none;
-    background: linear-gradient(90deg, var(--teal) 0 2px, var(--aqua) 2px 4px, var(--sand) 4px 6px, var(--mustard) 6px 8px, var(--burnt) 8px 10px, var(--tomato) 10px 12px); }
+    background: linear-gradient(90deg, var(--teal) 0 2px, var(--aqua) 2px 4px, var(--sand) 4px 6px, var(--mustard) 6px 8px, var(--burnt) 8px 10px, var(--mulberry) 10px 12px); }
   .rise svg { position: absolute; overflow: visible; fill: none; stroke-width: 2.2; }
   .rise .turn { left: 0; top: -24px; width: 24px; height: 24px; }
   .rise .fan { left: -30px; top: 100%; width: 80px; height: 140px; }
@@ -262,11 +265,11 @@ const ASCENT_STYLE = `
   h1 { font-family: 'Fraunces', Georgia, serif; font-weight: 800; font-variation-settings: 'SOFT' 100, 'WONK' 1; letter-spacing: -0.012em; font-size: clamp(1.5rem, 5.5vw, 1.95rem); line-height: 1.15; margin: 0 0 1rem; }
   p { margin: 0 0 1.1rem; color: var(--ink); }
   code { font-size: 0.9em; word-break: break-all; background: color-mix(in srgb, var(--sand) 45%, white); padding: 0.1em 0.35em; border-radius: 6px; }
-  a.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; font-family: 'Fraunces', Georgia, serif; font-size: 1.1875rem; font-weight: 700; font-variation-settings: 'SOFT' 100, 'WONK' 1; color: var(--cream); background: var(--tomato); border-radius: 980px; padding: 0.6rem 1.6rem; text-decoration: none; transition: transform .08s; }
-  a.button:hover, a.button:active { background: var(--deepred); }
+  a.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; font-family: 'Fraunces', Georgia, serif; font-size: 1.1875rem; font-weight: 700; font-variation-settings: 'SOFT' 100, 'WONK' 1; color: var(--cream); background: var(--mulberry); border-radius: 980px; padding: 0.6rem 1.6rem; text-decoration: none; transition: transform .08s; }
+  a.button:hover, a.button:active { background: var(--deepmulberry); }
   a.button:active { transform: scale(.985); }
   a.button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-  .error { color: var(--ink); font-size: 0.95rem; margin: 0 0 1rem; padding-left: 0.75rem; border-left: 4px solid var(--tomato); }
+  .error { color: var(--ink); font-size: 0.95rem; margin: 0 0 1rem; padding-left: 0.75rem; border-left: 4px solid var(--mulberry); }
   .note { color: var(--teal); font-size: 0.95rem; margin: 0 0 1rem; }
   .actions { margin-top: 1.25rem; }
   @media (prefers-reduced-motion: reduce) { a.button { transition: none; } }
@@ -281,7 +284,7 @@ const ASCENT_STYLE = `
 // from a centred card (50vh + half the card), the turn and the fan are fixed-size SVG at its ends.
 // Replaced a flat stripe band and the fixed teal frame on 2026-10-01 (Gary: "let's drop the teal
 // container"; "I don't love the stripes not representing context flowing from bottom to up").
-const RIBBON = ['teal', 'aqua', 'sand', 'mustard', 'burnt', 'tomato'];
+const RIBBON = ['teal', 'aqua', 'sand', 'mustard', 'burnt', 'mulberry'];
 export function riseHtml(): string {
   // The turn: strand i runs up at x = 1 + 2i and ends on thread row y = 1 + 2i at the card's edge.
   const turn = RIBBON.map((c, i) => {

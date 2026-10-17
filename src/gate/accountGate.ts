@@ -383,7 +383,7 @@ ${doorHead(t, theme)}
   ${theme === 'ascent' ? riseHtml() : ''}
   <p class="eyebrow">${t}</p>
   <h1>${escapeHtml(heading)}</h1>
-  <p>${escapeHtml(body)}</p>
+  ${body ? `<p>${escapeHtml(body)}</p>` : ''}
   ${signedOut ? '<p class="note">You are signed out of this site. Signing in again is one tap unless you also signed out of the account itself.</p>' : ''}
   ${expired ? '<p class="error">That sign-in link expired. Sign in again and it will bring you straight here.</p>' : ''}
   <div class="actions"><a class="button" href="${escapeHtml(signInHref)}">Sign in</a></div>

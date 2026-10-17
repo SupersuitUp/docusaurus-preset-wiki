@@ -317,3 +317,12 @@ test('door theme "maison" draws the Maison: stone or night by the phone, pair A,
   assert.match(door, /early access program/, 'theme changes the look, not the words');
   assert.match(no, /someone@x/);
 });
+
+test('an empty door body draws no line at all, so a door can be one sentence and a button', async () => {
+  // Gary, 2026-10-17, on the Supersuit Wiki's door: "This website is gated. That's it".
+  const door = await (await gated({ door: { heading: 'This website is gated.', body: '', theme: 'maison' } })(req('https://t.wiki/x')))!.text();
+  assert.match(door, /<h1>This website is gated\.<\/h1>/);
+  assert.doesNotMatch(door, /<p>\s*<\/p>/, 'no empty paragraph where the line was');
+  assert.doesNotMatch(door, /invited with/, 'the default line does not come back');
+  assert.match(door, /class="button"[^>]*>Sign in</);
+});

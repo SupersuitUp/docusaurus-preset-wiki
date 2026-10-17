@@ -5,6 +5,14 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.18.1 (2026-10-17)
+
+**An empty `gate.door.body` draws no line.** A door can now be one sentence and a button: `"door": { "heading": "This website is gated.", "body": "" }`. Before, an empty body rendered an empty paragraph, and leaving it out brought back the default early-access line. First use: the Supersuit Wiki (Gary, 2026-10-17: "This website is gated. That's it").
+
+- **DETECTOR:** a door configured with `"body": ""` showing a blank gap under its heading.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`.
+- 1 new test: an empty body leaves no `<p></p>`, no default line, and the Sign in button.
+
 ## 1.18.0 (2026-10-17)
 
 **The sign-in door can wear the Maison: `gate.door.theme: "maison"`.** The Supersuit Wiki took the Maison on 2026-10-16 (continental-works-universe `canon/craft/the-maison.json`, the Continental Works brand since 2026-10-15) and its door was still the neutral card, so a reader met a different house at the door than the one behind it (Gary, 2026-10-17: "The supersuit wiki gating screens need to be updated to new branding same with the redirect pages"). The new theme draws the door, the signed-out and expired states, and the not-allowed page the way the kit says a product surface wears the Maison (`maison-kit.json` piece `product-ground-follows-phone`): stone in light mode (marble ground, ink type, walnut Sign in), night in dark mode (night ground, mist type, bronze Sign in), chosen by the reader's phone, with a `theme-color` per scheme. DM Serif Display inscribes the heading and DM Sans at 400 and up reads the rest (`maison-type`). Every colour is one of the seven house tokens or a mix of two, so nothing on the door is saturated (no-go `decorative-colour`). The words are unchanged. The Ascent stays available, and its schema description now says it is archived.

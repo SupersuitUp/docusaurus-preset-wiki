@@ -284,3 +284,36 @@ test('the ascent door has no teal frame, and its ribbon rises from a fan into th
   assert.ok(no.includes(riseHtml()));
   assert.doesNotMatch(await (await gated()(req('https://t.wiki/x')))!.text(), /class="rise"/, 'neutral door untouched');
 });
+
+// THE MAISON DOOR (2026-10-17), for a product wiki that wears the Maison (the Supersuit Wiki).
+// continental-works-universe canon/craft/maison-kit.json, piece product-ground-follows-phone:
+// stone in light mode, night in dark mode, chosen by the reader's phone; DM Serif Display to
+// inscribe and DM Sans at 400 and up to read (maison-type); no saturated colour on the house
+// (no-go decorative-colour). Gary, 2026-10-17: "The supersuit wiki gating screens need to be
+// updated to new branding."
+const MAISON = { night: '#17171a', walnut: '#2e2119', travertine: '#e8e0d2', marble: '#f4f1ec', bronze: '#a8834f', ink: '#1c1a17', mist: '#d8d1c4' };
+const hexesIn = (html: string) => [...(html.match(/<style>[\s\S]*<\/style>/)?.[0] ?? '').matchAll(/#[0-9a-f]{6}\b/gi)].map((m) => m[0].toLowerCase());
+
+test('door theme "maison" draws the Maison: stone or night by the phone, pair A, nothing saturated', async () => {
+  const { notAllowedPage, DOOR_THEMES } = await import('./accountGate');
+  assert.ok(DOOR_THEMES.includes('maison'));
+  const door = await (await gated({ door: { theme: 'maison' } })(req('https://t.wiki/x')))!.text();
+  const no = notAllowedPage('t.wiki', 'someone@x', 'maison');
+  for (const page of [door, no]) {
+    for (const [name, hex] of Object.entries(MAISON)) assert.match(page, new RegExp(`--${name}: ${hex};`), `the ${name} token`);
+    assert.match(page, /family=DM\+Serif\+Display/, 'the inscription face');
+    assert.match(page, /family=DM\+Sans/, 'the reading face');
+    assert.match(page, /@media \(prefers-color-scheme: dark\)/, 'the ground follows the phone');
+    assert.match(page, /<meta name="theme-color" content="#f4f1ec" media="\(prefers-color-scheme: light\)"/);
+    assert.match(page, /<meta name="theme-color" content="#17171a" media="\(prefers-color-scheme: dark\)"/);
+    assert.match(page, /a\.button \{[^}]*background: var\(--press\)/, 'the action is the pressed colour');
+    assert.match(page, /:root \{[^}]*--press: var\(--walnut\)/, 'walnut to press on stone');
+    assert.match(page, /prefers-color-scheme: dark\) \{ :root \{[^}]*--press: var\(--bronze\)/, 'bronze to press at night');
+    const stray = hexesIn(page).filter((h) => !Object.values(MAISON).includes(h));
+    assert.deepEqual(stray, [], 'every colour on the door is a house token');
+    assert.doesNotMatch(page, /Fraunces|class="rise"|mulberry|#2f6f5f/i, 'nothing of the Ascent or the neutral card');
+    assert.doesNotMatch(page, /font-weight: [123]00\b/, 'reading type is never light');
+  }
+  assert.match(door, /early access program/, 'theme changes the look, not the words');
+  assert.match(no, /someone@x/);
+});

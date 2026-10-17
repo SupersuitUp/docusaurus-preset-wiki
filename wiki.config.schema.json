@@ -144,8 +144,8 @@
             "heading": { "type": "string" },
             "body": { "type": "string" },
             "theme": {
-              "enum": ["neutral", "ascent"],
-              "description": "The door's look. neutral (default): a plain card naming no one. ascent: the Continental Works look (teal poster border, six-stripe ribbon, Fraunces, mulberry action), for a wiki that wears the Ascent."
+              "enum": ["neutral", "ascent", "maison"],
+              "description": "The door's look. neutral (default): a plain card naming no one. maison: the Maison, stone in light mode and night in dark mode by the reader's phone, DM Serif Display over DM Sans, for a wiki that wears the Maison (the Supersuit Wiki). ascent: the archived Continental Works look (six-stripe ribbon, Fraunces, mulberry action), kept for a wiki not yet moved."
             }
           }
         },

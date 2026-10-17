@@ -218,8 +218,17 @@ export interface DoorState {
 // update Abu and propagate across all surfaces"). A wiki opts in with `gate.door.theme`. Added 2026-10-01 when getfreedom.wiki
 // took the Ascent and its door was still the neutral card (Gary: "The authentication redirect
 // page and login page need update too").
-export type DoorTheme = 'neutral' | 'ascent';
-export const DOOR_THEMES: readonly DoorTheme[] = ['neutral', 'ascent'];
+//
+// `maison` is the Maison, the Continental Works brand since 2026-10-15 (continental-works-universe
+// canon/craft/the-maison.json and maison-kit.json), drawn the way the kit says a PRODUCT surface
+// wears it (piece product-ground-follows-phone): stone in light mode, night in dark mode, chosen by
+// the reader's phone. DM Serif Display inscribes, DM Sans at 400 and up reads (maison-type). Every
+// colour is one of the seven house tokens or a mix of two (no-go decorative-colour), so the action
+// is walnut on stone and bronze at night, never a saturated fill. Added 2026-10-17 for the Supersuit
+// Wiki, which took the Maison on 2026-10-16 while its door was still the neutral card (Gary: "The
+// supersuit wiki gating screens need to be updated to new branding same with the redirect pages").
+export type DoorTheme = 'neutral' | 'ascent' | 'maison';
+export const DOOR_THEMES: readonly DoorTheme[] = ['neutral', 'ascent', 'maison'];
 
 const NEUTRAL_STYLE = `
   :root { --ink: #1c1c1a; --paper: #fdfcf9; --card: #ffffff; --muted: #6d6a63; --line: #e5e1d8; --accent: #2f6f5f; }
@@ -237,6 +246,38 @@ const NEUTRAL_STYLE = `
   .error { color: #a3543c; font-size: 0.95rem; margin: 0 0 1rem; }
   .note { color: var(--accent); font-size: 0.95rem; margin: 0 0 1rem; }
   .actions { margin-top: 1.25rem; }
+`;
+
+// The seven house tokens are restated as literals for the same reason the Ascent's are below: this
+// runs at the edge with no file access. The hexes are the-maison.json's `tokens`; the --wiki-*
+// roles match the Supersuit Wiki's own src/css/custom.css, so the door and the wiki behind it are
+// the same room.
+const MAISON_STYLE = `
+  :root { --night: #17171a; --walnut: #2e2119; --travertine: #e8e0d2; --marble: #f4f1ec; --bronze: #a8834f; --ink: #1c1a17; --mist: #d8d1c4;
+    --ground: var(--marble); --text: var(--ink); --strong: var(--ink); --mute: color-mix(in srgb, var(--ink) 70%, var(--marble));
+    --line: color-mix(in srgb, var(--bronze) 42%, var(--marble)); --fitting: var(--bronze);
+    --press: var(--walnut); --on-press: var(--marble); --press-deep: color-mix(in srgb, var(--walnut) 80%, var(--ink));
+    --code: color-mix(in srgb, var(--travertine) 60%, var(--marble)); color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root { --ground: var(--night); --text: var(--mist); --strong: var(--marble); --mute: color-mix(in srgb, var(--mist) 72%, var(--night));
+    --line: color-mix(in srgb, var(--bronze) 35%, var(--night)); --press: var(--bronze); --on-press: var(--night); --press-deep: color-mix(in srgb, var(--bronze) 80%, var(--mist));
+    --code: color-mix(in srgb, var(--walnut) 30%, var(--night)); color-scheme: dark; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { background: var(--ground); }
+  body { background: var(--ground); color: var(--text); font: 400 1.0625rem/1.65 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; min-height: 100vh; min-height: 100svh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  main { width: 100%; max-width: 30rem; }
+  .eyebrow { font-size: 0.75rem; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--fitting); margin: 0 0 1.4rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+  h1 { font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; font-size: clamp(1.7rem, 6vw, 2.2rem); line-height: 1.15; color: var(--strong); margin: 0 0 1rem; text-wrap: balance; }
+  p { margin: 0 0 1.1rem; color: var(--text); }
+  code { font-size: 0.9em; word-break: break-all; background: var(--code); padding: 0.1em 0.35em; border-radius: 4px; }
+  a.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; font: 500 1rem/1 'DM Sans', system-ui, sans-serif; letter-spacing: 0.04em; color: var(--on-press); background: var(--press); border-radius: 999px; padding: 0.75rem 1.7rem; text-decoration: none; transition: transform .08s; }
+  a.button:hover, a.button:active { background: var(--press-deep); }
+  a.button:active { transform: scale(.985); }
+  a.button:focus-visible { outline: 2px solid var(--fitting); outline-offset: 3px; }
+  .error { font-size: 0.95rem; margin: 0 0 1rem; padding-left: 0.75rem; border-left: 2px solid var(--fitting); }
+  .note { color: var(--mute); font-size: 0.95rem; margin: 0 0 1rem; }
+  .actions { margin-top: 1.6rem; }
+  @media (prefers-reduced-motion: reduce) { a.button { transition: none; } }
 `;
 
 // The eleven Ascent tokens are restated as literals because this runs at the edge with no file
@@ -309,13 +350,21 @@ function doorHead(t: string, theme: DoorTheme = 'neutral'): string {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,700..900,0..100,0..1&display=swap" />
 <meta name="theme-color" content="#105971" />
 `
+    : theme === 'maison'
+    ? `<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500&display=swap" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#f4f1ec" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#17171a" media="(prefers-color-scheme: dark)" />
+`
     : '';
   return `<head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>${t}</title>
 <meta name="robots" content="noindex" />
-${fonts}<style>${theme === 'ascent' ? ASCENT_STYLE : NEUTRAL_STYLE}</style>
+${fonts}<style>${theme === 'ascent' ? ASCENT_STYLE : theme === 'maison' ? MAISON_STYLE : NEUTRAL_STYLE}</style>
 </head>`;
 }
 

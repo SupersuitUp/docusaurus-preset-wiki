@@ -104,6 +104,8 @@ test('gate.door.theme reaches the door, and an unknown theme is refused at build
   await withEnv({ WIKI_GATE_SECRET: 'gs' }, async () => {
     const mw = createMiddlewareFromConfig({ gate: { type: 'freedom-account', door: { theme: 'ascent' } } });
     assert.match(await (await mw(req('https://t.wiki/x')))!.text(), /family=Fraunces/);
+    const maison = createMiddlewareFromConfig({ gate: { type: 'freedom-account', door: { theme: 'maison' } } });
+    assert.match(await (await maison(req('https://t.wiki/x')))!.text(), /family=DM\+Serif\+Display/);
     assert.throws(() => gateFromConfig({ type: 'freedom-account', door: { theme: 'neon' as never } }), /door\.theme/);
   });
 });

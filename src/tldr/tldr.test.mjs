@@ -30,3 +30,14 @@ test('splice adds TL;DR under llms entries once', () => {
   assert.equal(twice.llmsTxt, once.llmsTxt);
   assert.match(once.llmsFull, /URL: https:\/\/w\/concepts\/a\nTL;DR: Short\./);
 });
+
+// Wikis load the TL;DR helpers from their own generators (getfreedom-wiki scripts/lib/tldr.mjs).
+// A deep `lib/tldr/tldr.mjs` path is refused by the exports map, so the subpath is public.
+test('the package exports ./tldr by name, resolving to the built helpers', async () => {
+  const resolved = import.meta.resolve('@supersuit/docusaurus-preset-wiki/tldr');
+  assert.match(resolved, /\/lib\/tldr\/tldr\.mjs$/);
+  const mod = await import('@supersuit/docusaurus-preset-wiki/tldr');
+  assert.equal(typeof mod.tldrProblems, 'function');
+  assert.equal(typeof mod.spliceLlms, 'function');
+  assert.equal(mod.MAX_WORDS, 60);
+});

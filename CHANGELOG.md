@@ -5,6 +5,14 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.19.1 (2026-10-18)
+
+**`wiki refresh-dates` no longer corrupts the snapshot it stages into a rename commit, and the TL;DR helpers are importable as `@supersuit/docusaurus-preset-wiki/tldr`.** The pre-commit hook runs before the commit exists: the working tree already carries a page's new name while `git log` still files its whole history under the old one. The collector resolved renames only from history, so a staged rename orphaned the page: every historical event kept the old docKey with a blank `routePath` and the old title recovered from history, and the new key lost its Created date. That wrong file was staged into the very commit, and the commit after it rewrote ~2,000 lines back. getfreedom-wiki restored the file from HEAD and committed with `--no-verify` on every commit from 2026-10-16 to 10-18. The collector now reads staged renames (`git diff --cached -M`) as the newest aliases, so the snapshot staged into a commit equals what the next full refresh writes on every event the two share. A staged DELETION was already right by contract and is unchanged: the page's events stay, unlinked (blank `routePath`, which the changelog renders as plain text); its `removed` event arrives with the commit itself.
+
+- **DETECTOR:** a commit that renames a doc page and whose `src/data/changelog-events.json` diff blanks `routePath` on that page's events or brings back its old title.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`; run `wiki refresh-dates` once on a clean tree and commit the snapshot if it moved. A wiki importing `.../lib/tldr/tldr.mjs` by file path switches to `@supersuit/docusaurus-preset-wiki/tldr`.
+- Tests: collect.test.ts gains a staged rename (new key, route, title and birthday) and a staged deletion (events kept, never linked); new refresh-dates.test.mjs runs the hook on a rename-and-delete fixture and asserts the staged snapshot matches the next refresh event for event (red on 1.19.0); tldr.test.mjs resolves the `./tldr` export.
+
 ## 1.19.0 (2026-10-18)
 
 **TL;DR is a preset convention: `tldr:` frontmatter renders as a block, is gated by `wiki check tldr`, and is spliced into the llms files.** Supersuit Wiki carried this as a local remark plugin, a local script and local CSS, so every other wiki would have had to copy it. It now ships here. A page with `tldr:` frontmatter gets a `wiki-tldr` block above its body (the remark plugin skips a page that already carries one, so a wiki that still has its own plugin running after the preset's does not draw it twice), `wiki check` fails a page whose TL;DR is malformed or missing where `tldr.require` demands it, and `llms.txt` and `llms-full.txt` carry a `TL;DR:` line per page.

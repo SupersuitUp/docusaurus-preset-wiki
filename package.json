@@ -1,6 +1,6 @@
 {
   "name": "@supersuit/docusaurus-preset-wiki",
-  "version": "1.19.0",
+  "version": "1.19.1",
   "description": "The bones of every wiki in the Supersuit family, as one Docusaurus preset.",
   "license": "MIT",
   "repository": {
@@ -27,6 +27,10 @@
     "./figures": {
       "types": "./lib/figures/index.d.ts",
       "default": "./lib/figures/index.js"
+    },
+    "./tldr": {
+      "types": "./lib/tldr/tldr.d.mts",
+      "default": "./lib/tldr/tldr.mjs"
     }
   },
   "bin": {

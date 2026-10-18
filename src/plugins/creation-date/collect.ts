@@ -334,6 +334,30 @@ export function collectHistory(siteDir: string): History {
     return key;
   };
 
+  // A rename that is STAGED but not yet committed is newer than every line of the log, so it is
+  // the first alias. This is the view the pre-commit hook (`wiki refresh-dates`) always has: the
+  // working tree already carries the new name, history still files every event under the old
+  // one. Without this the snapshot staged into a rename commit orphans the page's history (blank
+  // routePath, the old title recovered from history, no dates for the new key), and every commit
+  // after it had to restore the file by hand (getfreedom-wiki, 2026-10-16 to 10-18). On Vercel's
+  // clone the index is clean and this adds nothing.
+  try {
+    const staged = execSync('git diff --cached -M --diff-filter=R --name-status -- docs/', {
+      cwd: siteDir,
+      encoding: 'utf-8',
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    for (const line of staged.split('\n')) {
+      const cols = line.split('\t');
+      if (!cols[0]?.startsWith('R') || cols.length < 3) continue;
+      const fromKey = docKeyFromRepoPath(cols[1], sitePrefix);
+      const toKey = docKeyFromRepoPath(cols[2], sitePrefix);
+      if (fromKey && toKey && fromKey !== toKey) renameAlias.set(fromKey, toKey);
+    }
+  } catch {
+    // no index to read (not a work tree, or no HEAD yet): nothing is staged against history
+  }
+
   const events: ChangeEvent[] = [];
   let curDate = '';
   let curHash = '';

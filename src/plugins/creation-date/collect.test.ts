@@ -148,3 +148,47 @@ test('mergePageDates keeps the earliest birth and the latest touch, comparing in
   assert.deepEqual(merged.b, { updated: '2026-09-01T12:00:00-04:00', created: '2026-09-01T12:00:00-04:00' });
   assert.deepEqual(merged.c, { created: '2026-09-05T00:00:00Z' });
 });
+
+// The pre-commit hook (`wiki refresh-dates`) runs BEFORE the commit exists: the working tree and
+// the index already hold the rename or deletion, git log does not. Read naively, a staged rename
+// orphans the page's whole history under its old key (blank routePath, the old title recovered
+// from history, no dates for the new key), and that wrong snapshot is staged INTO the commit.
+// getfreedom-wiki, 2026-10-16 to 10-18: every commit after a rename had to restore the file.
+test('a STAGED rename (the pre-commit view) keeps the history on the new key, route and title', () => {
+  const { root, commit } = repo();
+  writeFileSync(join(root, 'docs', 'concepts', 'old-name.md'), page('Old Title'));
+  writeFileSync(join(root, 'docs', 'concepts', 'keep.md'), page('Keep'));
+  commit('born', 1);
+  writeFileSync(join(root, 'docs', 'concepts', 'old-name.md'), page('Old Title', 'Edited.'));
+  commit('edited', 2);
+  // Rename and retitle, staged but not committed, exactly what the hook sees.
+  git(root, 'mv', 'docs/concepts/old-name.md', 'docs/concepts/new-name.md');
+  writeFileSync(join(root, 'docs', 'concepts', 'new-name.md'), page('New Title', 'Edited.'));
+  git(root, 'add', '-A');
+
+  const { changeEvents, pageDates } = collectHistory(root);
+  const moved = changeEvents.filter((e) => e.id.startsWith('concepts/old-name@') || e.id.startsWith('concepts/new-name@'));
+  assert.equal(moved.length, 2, 'both historical events survive');
+  for (const e of moved) {
+    assert.equal(e.docKey, 'concepts/new-name', 'filed under the name the page will have');
+    assert.equal(e.routePath, '/concepts/new-name', 'linked, not blanked');
+    assert.equal(e.title, 'New Title', 'the live title, not the one recovered from history');
+  }
+  assert.equal(pageDates['concepts/new-name']?.created?.slice(0, 10), '2026-09-01');
+  assert.equal(pageDates['concepts/new-name']?.updated?.slice(0, 10), '2026-09-02');
+});
+
+test('a STAGED deletion leaves the page events unlinked, never pointing at a route that is gone', () => {
+  const { root, commit } = repo();
+  writeFileSync(join(root, 'docs', 'concepts', 'gone.md'), page('Gone'));
+  writeFileSync(join(root, 'docs', 'concepts', 'stays.md'), page('Stays'));
+  commit('born', 1);
+  git(root, 'rm', '-q', 'docs/concepts/gone.md');
+
+  const { changeEvents, pageDates } = collectHistory(root);
+  const gone = changeEvents.filter((e) => e.docKey === 'concepts/gone');
+  assert.equal(gone.length, 1, 'its history stays: the page was created on the 1st');
+  assert.equal(gone[0].routePath, '', 'the ChangelogWidget renders an event with no routePath as plain text');
+  assert.equal(gone[0].title, 'Gone');
+  assert.equal(pageDates['concepts/gone'], undefined, 'a page that will not be built is not dated');
+});

@@ -45,6 +45,7 @@ const CHECKS = {
   'page-graphics': () => node('check-page-graphics.mjs', ...rest.filter((a) => a.startsWith('--'))),
   voice: () => node('check-voice.mjs'),
   'retired-words': () => node('check-retired-words.mjs'),
+  tldr: () => node('check-tldr.mjs', ...rest.filter((a) => a.startsWith('--'))),
   llms: () => node('llms-txt.mjs'),
   links: () => node('check-links.mjs'),
   'image-weight': () => node('check-image-weight.mjs'),

@@ -38,7 +38,9 @@ const pages = existsSync(DOCS)
 const problems = pages.flatMap((p) => checkSource(p.rel, p.source));
 if (require) {
   for (const p of pages) {
-    if (p.tldr === undefined && p.exempt === undefined) {
+    if (p.exempt !== undefined && !(typeof p.exempt === 'string' && p.exempt.trim())) {
+      problems.push(`${p.rel}: tldr_exempt needs a reason; write why this page has no TL;DR (index stub, redirect)`);
+    } else if (p.tldr === undefined && p.exempt === undefined) {
       problems.push(`${p.rel}: has no tldr; write the takeaway, or add "tldr_exempt: <reason>" for an index or redirect stub`);
     }
   }

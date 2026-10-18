@@ -35,6 +35,12 @@ test('builds title, url and the preset entry', () => {
   assert.equal(presets[1][1].title, 'T');
 });
 
+test('every wiki gets the TL;DR remark plugin on its docs', () => {
+  const plugins = (defineWikiConfig(wiki).presets as any[])[0][1].docs.remarkPlugins;
+  assert.equal(plugins.length, 1);
+  assert.equal(typeof plugins[0], 'function');
+});
+
 test('noindex adds the robots meta and disables the sitemap', () => {
   const c = defineWikiConfig(wiki);
   const robots = (c.headTags as any[]).find((t) => t.attributes?.name === 'robots');

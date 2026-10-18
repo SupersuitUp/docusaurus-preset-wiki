@@ -5,6 +5,14 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.19.0 (2026-10-18)
+
+**TL;DR is a preset convention: `tldr:` frontmatter renders as a block, is gated by `wiki check tldr`, and is spliced into the llms files.** Supersuit Wiki carried this as a local remark plugin, a local script and local CSS, so every other wiki would have had to copy it. It now ships here. A page with `tldr:` frontmatter gets a `wiki-tldr` block above its body (the remark plugin skips a page that already carries one, so a wiki that still has its own plugin running after the preset's does not draw it twice), `wiki check` fails a page whose TL;DR is malformed or missing where `tldr.require` demands it, and `llms.txt` and `llms-full.txt` carry a `TL;DR:` line per page.
+
+- **DETECTOR:** a wiki with a local `src/remark/tldr.mjs`, `scripts/tldr.mjs` or `.wiki-tldr` rules in its `custom.css`.
+- **REMEDY:** `pnpm update @supersuit/docusaurus-preset-wiki`, delete those files and the local remark wiring in `docusaurus.config.ts` in the SAME commit as the bump, and drop the `scripts/tldr.mjs` steps from `prebuild`.
+- Tests: the gate, the renderer (including the double-block guard) and the llms splice each have their own cases.
+
 ## 1.18.1 (2026-10-17)
 
 **An empty `gate.door.body` draws no line.** A door can now be one sentence and a button: `"door": { "heading": "This website is gated.", "body": "" }`. Before, an empty body rendered an empty paragraph, and leaving it out brought back the default early-access line. First use: the Supersuit Wiki (Gary, 2026-10-17: "This website is gated. That's it").

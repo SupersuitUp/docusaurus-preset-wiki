@@ -61,6 +61,12 @@ test('the definition line is styled by the selector the DOM actually produces', 
   }
 });
 
+test('the TL;DR block has its three rules in the framework stylesheet', () => {
+  for (const c of ['.wiki-tldr {', 'p.wiki-tldr__label', 'p.wiki-tldr__text']) {
+    assert.ok(RULES.includes(c), `${c} missing from wiki.css`);
+  }
+});
+
 test('the dark text tokens clear WCAG AA against a near-black page', () => {
   const srgb = (hex) => {
     const n = hex.replace('#', '');

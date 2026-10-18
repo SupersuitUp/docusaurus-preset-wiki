@@ -168,6 +168,46 @@
 }
 
 /* ============================
+   TL;DR block
+   ============================ */
+
+/* The takeaway, rendered from frontmatter `tldr:` by the preset's remark plugin. Set off by a
+   rule in the code accent colour rather than a coloured box. Colours come from the existing
+   tokens, so dark mode follows without a rule of its own. */
+.wiki-tldr {
+  margin: 0 0 1.75rem;
+  padding: 0.85rem 1.1rem 0.9rem;
+  border-left: 3px solid var(--wiki-code-color);
+  border-radius: 0 6px 6px 0;
+  background: color-mix(in srgb, var(--wiki-code-color) 6%, transparent);
+}
+
+.markdown .wiki-tldr p.wiki-tldr__label {
+  margin: 0 0 0.3rem;
+  font-family: var(--ifm-heading-font-family);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--wiki-code-color);
+}
+
+.markdown .wiki-tldr p.wiki-tldr__text {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--wiki-text-body);
+}
+
+@media (max-width: 600px) {
+  .wiki-tldr {
+    padding: 0.75rem 0.9rem 0.8rem;
+  }
+  .markdown .wiki-tldr p.wiki-tldr__text {
+    font-size: 1rem;
+  }
+}
+
+/* ============================
    Horizontal rule
    ============================ */
 

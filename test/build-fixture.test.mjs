@@ -78,6 +78,14 @@ test('a fixture instance builds from the package and emits every framework outpu
   assert.match(page, /aria-label=("Search"|Search)/, 'preset SearchBar rendered in the navbar (theme-classic\'s is empty)');
   assert.match(page, /<a[^>]*href=("\/"|\/)[^>]*target=("_blank"|_blank)/, 'preset MDXComponents/A wrapper applied to a body link');
 
+  // The TL;DR block is in the static HTML (once), and the llms pair carries the same takeaway.
+  const tldrPage = readFileSync(join(out, 'concepts', 'tldr-page', 'index.html'), 'utf8');
+  assert.match(tldrPage, /class=("wiki-tldr"|wiki-tldr)/, 'TL;DR block rendered into the static HTML');
+  assert.match(tldrPage, /The fixture page that proves the takeaway block renders\./, 'TL;DR text rendered');
+  assert.equal((tldrPage.match(/class="?wiki-tldr[ ">]/g) ?? []).length, 1, 'exactly one TL;DR block');
+  assert.match(readFileSync(join(out, 'llms.txt'), 'utf8'), /TL;DR: The fixture page that proves the takeaway block renders\./, 'llms.txt carries the TL;DR');
+  assert.match(readFileSync(join(out, 'llms-full.txt'), 'utf8'), /TL;DR: The fixture page that proves/, 'llms-full.txt carries the TL;DR');
+
   const css = readdirSync(join(out, 'assets', 'css')).filter((f) => f.endsWith('.css'));
   assert.ok(css.length > 0, 'css emitted');
   const cssText = css.map((f) => readFileSync(join(out, 'assets', 'css', f), 'utf8')).join('\n');

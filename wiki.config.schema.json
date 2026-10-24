@@ -132,6 +132,10 @@
           "type": "string",
           "description": "freedom-account only. The NAME of an environment variable holding the account ids allowed in, comma-separated (e.g. WIKI_ALLOWED_ACCOUNTS). Set: only those accounts are admitted, and an empty or missing variable admits nobody. Absent: every active account is admitted. The ids live in the deployment, never in this file."
         },
+        "shareAdminsEnv": {
+          "type": "string",
+          "description": "freedom-account only. The NAME of an environment variable holding the account ids that may make one-page share links, comma-separated (e.g. WIKI_SHARE_ADMINS). Set: only those accounts get a link from the Share button, and an empty or missing variable lets nobody make one. Absent: every admitted reader can. Links already made keep opening."
+        },
         "grantDays": {
           "type": "number",
           "description": "freedom-account only. How long one sign-in lasts. Default 7."

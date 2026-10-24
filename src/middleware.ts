@@ -24,7 +24,7 @@
 import { handleShare, type ShareRequest } from './share/handleShare';
 import matcherJson from './cli/matcher.json';
 import { handleSignOut } from './gate/signOut';
-import { gateFromConfig as gateFromConfigFn, type WikiGateConfig as WikiGateConfigShape } from './gate/fromConfig';
+import { gateFromConfig as gateFromConfigFn, shareAdminsFromConfig, type WikiGateConfig as WikiGateConfigShape } from './gate/fromConfig';
 import {
   READ_PATH, readAck, eventFromBeacon, buildEvent, sendEvent, dispatch, resolveSink, sameSiteRoute, isPrefetch,
   type AnalyticsOption, type MiddlewareContext, type ReadEvent, type ReadSink,
@@ -67,6 +67,9 @@ export interface MiddlewareOptions {
   analytics?: AnalyticsOption;
   /** For tests: the fetch that carries an event to the sink. */
   fetch?: typeof fetch;
+  /** Who may mint share links (src/share/handleShare.ts). Absent: every authorized reader. A
+   *  function is read per request, since the list lives in the deployment's env. */
+  shareAdmins?: readonly string[] | (() => readonly string[] | undefined);
 }
 
 export {
@@ -141,6 +144,8 @@ export function createMiddleware(opts: MiddlewareOptions = {}) {
       authorized: verdict.authorized,
       secret,
       gated,
+      reader: verdict.reader,
+      shareAdmins: typeof opts.shareAdmins === 'function' ? opts.shareAdmins() ?? [] : opts.shareAdmins,
     });
     if (share) {
       // A served mirror is a read the beacon cannot see: the mirror runs no script.
@@ -215,5 +220,5 @@ export type { WikiGateConfig, WikiGateType } from './gate/fromConfig';
  *   export default createMiddlewareFromConfig(wiki);
  */
 export function createMiddlewareFromConfig(wiki: { gate?: WikiGateConfigShape; analytics?: AnalyticsOption }) {
-  return createMiddleware({ gate: gateFromConfigFn(wiki.gate), analytics: wiki.analytics });
+  return createMiddleware({ gate: gateFromConfigFn(wiki.gate), analytics: wiki.analytics, shareAdmins: shareAdminsFromConfig(wiki.gate) });
 }

@@ -13,6 +13,7 @@
 //     "signInUrl": "https://…",     account gate: the portal page that signs a reader in
 //     "openPaths": "regex source",  account gate: REPLACES the default machine-path pattern
 //     "grantDays": 7,               account gate: how long a sign-in lasts
+//     "shareAdminsEnv": "WIKI_SHARE_ADMINS"  account gate: only these accounts mint share links
 //     "title": "…"                  what the door calls the wiki; defaults to the host
 //   }
 //
@@ -45,6 +46,9 @@ export interface WikiGateConfig {
   title?: string;
   /** freedom-account only: the NAME of an env var holding the allowed account ids, comma-separated. */
   allowEnv?: string;
+  /** freedom-account only: the NAME of an env var holding the account ids that may mint
+   *  one-page share links, comma-separated. Absent: every admitted reader may. */
+  shareAdminsEnv?: string;
   /** freedom-account only: the door's own heading and line, for a wiki that is not early access. */
   door?: { heading?: string; body?: string; theme?: DoorTheme };
 }
@@ -89,4 +93,12 @@ export function gateFromConfig(gate: WikiGateConfig | undefined): GateFn | undef
     allow: gate?.allowEnv ? () => parseAllowList(process.env[gate.allowEnv as string]) : undefined,
     door: gate?.door,
   });
+}
+
+/** Who may mint share links, from the config: a per-request read of the env var it names, or
+ *  undefined (every authorized reader) when it names none. Missing or empty admits nobody. */
+export function shareAdminsFromConfig(gate: WikiGateConfig | undefined): (() => string[]) | undefined {
+  const name = gate?.shareAdminsEnv;
+  if (!name || (gate?.type ?? 'password') !== 'freedom-account') return undefined;
+  return () => parseAllowList(process.env[name]);
 }

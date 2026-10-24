@@ -100,6 +100,25 @@ test('allowEnv names the env var holding the allowed account ids, read per reque
   });
 });
 
+test('shareAdminsEnv: only the accounts it names can mint a share link, read per request', async () => {
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const grant = (uid: string) => `fw_gate=v1.${uid}.${exp}.${hex('ps', `wiki-grant:v1.${uid}.${exp}`)}`;
+  const mint = (mw: ReturnType<typeof createMiddlewareFromConfig>, uid: string) =>
+    mw(req('https://t.wiki/s/mint?path=/concepts/x', { cookie: grant(uid) }));
+  await withEnv({ WIKI_PASS_SECRET: 'ps', WIKI_GATE_SECRET: 'gs', WIKI_SHARE_ADMINS: 'gary' }, async () => {
+    const mw = createMiddlewareFromConfig({ gate: { type: 'freedom-account', shareAdminsEnv: 'WIKI_SHARE_ADMINS' } });
+    assert.equal((await mint(mw, 'gary'))?.status, 200);
+    assert.equal((await mint(mw, 'wilson'))?.status, 403);
+    assert.equal(await mw(req('https://t.wiki/concepts/x', { cookie: grant('wilson') })), undefined, 'a non-admin still reads');
+    process.env.WIKI_SHARE_ADMINS = '';
+    assert.equal((await mint(mw, 'gary'))?.status, 403, 'emptied: nobody mints');
+  });
+  await withEnv({ WIKI_PASS_SECRET: 'ps', WIKI_GATE_SECRET: 'gs' }, async () => {
+    const open = createMiddlewareFromConfig({ gate: { type: 'freedom-account' } });
+    assert.equal((await mint(open, 'stranger'))?.status, 200, 'no shareAdminsEnv: every reader mints, as before');
+  });
+});
+
 test('gate.door.theme reaches the door, and an unknown theme is refused at build', async () => {
   await withEnv({ WIKI_GATE_SECRET: 'gs' }, async () => {
     const mw = createMiddlewareFromConfig({ gate: { type: 'freedom-account', door: { theme: 'ascent' } } });

@@ -6,7 +6,7 @@ import { sharePath } from './signedRoute';
 
 const SECRET = 's3';
 const ORIGIN = 'https://example.wiki';
-const req = (path: string, o: Partial<{ authorized: boolean; secret: string; gated: boolean }> = {}) =>
+const req = (path: string, o: Partial<{ authorized: boolean; secret: string; gated: boolean; reader: string; shareAdmins: readonly string[] }> = {}) =>
   handleShare({ url: new URL(path, ORIGIN), authorized: false, secret: SECRET, gated: true, ...o });
 
 test('mint: an authorized reader on a gated wiki gets the focused link', async () => {
@@ -65,4 +65,20 @@ test('a forged or unknown address is not this layer\'s to answer', async () => {
   assert.equal(await req('/s/aa3a052d187791dd'), undefined);
   assert.equal(await req('/concepts/x'), undefined);
   assert.equal(await req(p, { secret: '' }), undefined, 'with no secret nothing verifies');
+});
+
+test('mint: with share admins set, only an admin gets a link; every other reader is refused 403', async () => {
+  const admins = ['gary', 'wilson'];
+  assert.equal((await req('/s/mint?path=/concepts/x', { authorized: true, reader: 'wilson', shareAdmins: admins }))!.status, 200);
+  const refused = (await req('/s/mint?path=/concepts/x', { authorized: true, reader: 'stranger', shareAdmins: admins }))!;
+  assert.equal(refused.status, 403);
+  assert.equal((await refused.json()).error, 'not_share_admin');
+  assert.equal((await req('/s/mint?path=/concepts/x', { authorized: true, reader: 'key', shareAdmins: admins }))!.status, 403, 'an hourly key names no admin');
+  assert.equal((await req('/s/mint?path=/concepts/x', { authorized: true, shareAdmins: admins }))!.status, 403, 'no reader: no admin');
+  assert.equal((await req('/s/mint?path=/concepts/x', { authorized: true, reader: 'gary', shareAdmins: [] }))!.status, 403, 'an empty list admits nobody');
+});
+
+test('share admins restrict minting only: a link an admin already made still opens for anyone', async () => {
+  const r = (await req(await sharePath(SECRET, '/concepts/x') as string, { shareAdmins: ['gary'] }))!;
+  assert.match(r.headers.get('x-middleware-rewrite') ?? '', /share-view\/concepts\/x/);
 });

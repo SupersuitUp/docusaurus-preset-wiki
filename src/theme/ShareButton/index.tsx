@@ -15,24 +15,32 @@ import { linkForPage, mintAndCopy } from '../../share/mintAndCopy';
  * Safari expires the tap's activation across an await (src/share/mintAndCopy.ts).
  */
 export default function ShareButton(): React.JSX.Element {
-  const [label, setLabel] = useState<'idle' | 'minting' | 'copied' | 'copied-page' | 'shown'>('idle');
+  const [label, setLabel] = useState<'idle' | 'minting' | 'copied' | 'copied-page' | 'shown' | 'admin-only'>('idle');
   const [shown, setShown] = useState<string | null>(null);
 
   const handleClick = async () => {
     setLabel('minting');
     let result: { url: string; copied: boolean; focused: boolean };
+    let adminOnly = false;
     try {
       let focused = false;
       const r = await mintAndCopy({
         mint: async () => {
           const link = await linkForPage(window.location.href);
           focused = link.focused;
+          // Not a share admin: refuse here, so nothing that looks like a share reaches the clipboard.
+          if (link.adminOnly) { adminOnly = true; throw new Error('not_share_admin'); }
           return link.url;
         },
         clipboard: typeof navigator !== 'undefined' ? navigator.clipboard : undefined,
       });
       result = { ...r, focused };
     } catch {
+      if (adminOnly) {
+        setLabel('admin-only');
+        setTimeout(() => setLabel('idle'), 3000);
+        return;
+      }
       // linkForPage never throws, so this is the clipboard machinery itself failing.
       result = { url: window.location.origin + window.location.pathname, copied: false, focused: false };
     }
@@ -51,6 +59,7 @@ export default function ShareButton(): React.JSX.Element {
     : label === 'copied' ? 'copied · this page only'
     : label === 'copied-page' ? 'copied'
     : label === 'shown' ? 'copy this:'
+    : label === 'admin-only' ? 'only wiki admins can share pages'
     : 'copy link';
 
   return (

@@ -78,3 +78,9 @@ test('linkForPage falls back to the clean page url when there is no mint endpoin
   assert.deepEqual(await linkForPage('https://example.wiki/concepts/x', async () => { throw new Error('offline'); }), fallback);
   assert.deepEqual(await linkForPage('https://example.wiki/concepts/x', async () => new Response(JSON.stringify({ url: 'javascript:alert(1)' }), { status: 200 })), fallback);
 });
+
+test('linkForPage says when the edge refused because the reader is not a share admin', async () => {
+  const res = await linkForPage('https://example.wiki/concepts/x', async () =>
+    new Response(JSON.stringify({ error: 'not_share_admin' }), { status: 403 }));
+  assert.deepEqual(res, { url: 'https://example.wiki/concepts/x', focused: false, adminOnly: true });
+});

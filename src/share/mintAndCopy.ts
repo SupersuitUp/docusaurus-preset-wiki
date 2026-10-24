@@ -104,7 +104,7 @@ export async function mintAndCopy(deps: MintDeps): Promise<MintResult> {
 export async function linkForPage(
   href: string,
   fetchImpl: (input: string, init?: RequestInit) => Promise<Response> = fetch,
-): Promise<{ url: string; focused: boolean }> {
+): Promise<{ url: string; focused: boolean; adminOnly?: true }> {
   const page = new URL(href);
   const fallback = { url: page.origin + page.pathname, focused: false };
   try {
@@ -112,6 +112,12 @@ export async function linkForPage(
       credentials: 'same-origin',
       headers: { accept: 'application/json' },
     });
+    if (res.status === 403) {
+      // The wiki names share admins and this reader is not one: say so, never hand them a link
+      // that only looks like a share.
+      const refusal = (await res.json().catch(() => ({}))) as { error?: unknown };
+      if (refusal.error === 'not_share_admin') return { ...fallback, adminOnly: true };
+    }
     if (!res.ok) return fallback;
     const body = (await res.json()) as { url?: unknown; focused?: unknown };
     if (typeof body.url !== 'string' || !/^https?:\/\//.test(body.url)) return fallback;

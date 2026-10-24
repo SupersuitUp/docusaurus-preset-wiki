@@ -2,7 +2,10 @@
 // bot-block 403 and BEFORE its gate refuses. It answers two addresses and nothing else:
 //
 //   GET /s/mint?path=<route>     an AUTHORIZED reader asks for the share link of one page and
-//                                gets {url}. Nobody else gets one: the answer is 401. A wiki
+//                                gets {url}. Nobody else gets one: the answer is 401. When the
+//                                wiki names share admins, an authorized reader who is not one
+//                                is refused 403: reading a page is not the right to hand it to
+//                                a stranger (Gary, 2026-10-23: "only admins"). A wiki
 //                                with no gate answers with the page's own URL, because an open
 //                                page needs no other address.
 //   GET /s/<sig>/<route>         a share address. Genuine and the visitor is anonymous: serve
@@ -32,6 +35,12 @@ export interface ShareRequest {
   /** Whether a gate is live at all. Off: mint hands back the canonical URL, since the page is
    *  already open to anyone and a share address would only redirect there. */
   gated: boolean;
+  /** The account the gate named, when it named one. An hourly key reads as 'key'. */
+  reader?: string;
+  /** Who may mint. Absent: every authorized reader, as before. Present: only these account ids,
+   *  and an empty list admits nobody, so a missing variable fails CLOSED. Share addresses
+   *  already minted keep opening: this limits who makes links, never who follows them. */
+  shareAdmins?: readonly string[];
 }
 
 function json(status: number, body: unknown, extra: Record<string, string> = {}): Response {
@@ -44,12 +53,15 @@ function json(status: number, body: unknown, extra: Record<string, string> = {})
 /** Returns a Response when the request is the share layer's to answer, else undefined so the
  *  host gate carries on. */
 export async function handleShare(req: ShareRequest): Promise<Response | undefined> {
-  const { url, authorized, secret, gated } = req;
+  const { url, authorized, secret, gated, reader, shareAdmins } = req;
 
   if (url.pathname === MINT_PATH || url.pathname === MINT_PATH + '/') {
     const route = canonicalRoute(url.searchParams.get('path') ?? '');
     if (route === null) return json(400, { error: 'bad_path' });
     if (!authorized) return json(401, { error: 'not_authorized' });
+    if (shareAdmins !== undefined && !(reader && reader !== 'key' && shareAdmins.includes(reader))) {
+      return json(403, { error: 'not_share_admin' });
+    }
     if (!gated) return json(200, { url: new URL(route, url.origin).toString(), focused: false });
     if (!secret) return json(503, { error: 'sharing_disabled', why: 'no WIKI_SHARE_SECRET or WIKI_GATE_SECRET on this deployment' });
     const path = await sharePath(secret, route);

@@ -5,6 +5,10 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.20.1 (2026-10-23)
+
+**A machine without Pillow no longer stops the image tools.** `wiki hero` publish, `wiki icons` and `wiki optimize-images` used to refuse when python3 could not import Pillow (macOS's never can) and print a uv recipe for a person to retype. They now run through `uv run --with pillow python3` when uv is on PATH, and only refuse when neither works. One helper, `src/cli/pillow-python.mjs`, decides for every caller. Earned when two wiki publishes in one evening hit a missing Pillow.
+
 ## 1.20.0 (2026-10-23)
 
 **Only the accounts a wiki names can make one-page share links.** On a Freedom-account wiki, anyone admitted could press the Share button and mint a `/s/<sig>/<route>` link that opens that page to anyone at all, so reading a page carried the right to hand it to a stranger. A new `gate.shareAdminsEnv` names an environment variable of account ids (for example `WIKI_SHARE_ADMINS`); when it is set, `/s/mint` answers 403 `not_share_admin` to every other reader, an hourly `?k=` key names no admin, and a missing or empty variable lets nobody mint (fails closed, like `allowEnv`). The Share button tells a non-admin "only wiki admins can share pages" instead of copying a link. Links already minted keep opening: this limits who makes links, never who follows them. Absent, nothing changes. Gary, 2026-10-23: only admins should create share links.

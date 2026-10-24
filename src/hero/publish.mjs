@@ -22,6 +22,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSyn
 import { spawnSync } from 'node:child_process';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pillowPython, NO_PILLOW } from '../cli/pillow-python.mjs';
 
 const OPTIMIZER = join(dirname(fileURLToPath(import.meta.url)), '..', 'cli', 'python', 'optimize-images.py');
 /** Where the full-size source and its full recipe live, under the wiki root. */
@@ -38,11 +39,9 @@ export function heroUrl(outputDir, slug) {
 
 /** Run optimize-images.py on exactly these files, from the wiki root, output on our stderr. */
 function defaultOptimize(root, files) {
-  const probe = spawnSync('python3', ['-c', 'import PIL']);
-  if (probe.status !== 0) {
-    return { status: 1, error: 'python3 with Pillow is needed to write the WebP (`pip install pillow`, or `uv run --with pillow python3`)' };
-  }
-  const r = spawnSync('python3', [OPTIMIZER, ...files], { cwd: root, stdio: ['ignore', 2, 2] });
+  const py = pillowPython();
+  if (!py) return { status: 1, error: `${NO_PILLOW} to write the WebP` };
+  const r = spawnSync(py[0], [...py.slice(1), OPTIMIZER, ...files], { cwd: root, stdio: ['ignore', 2, 2] });
   return { status: r.status ?? 1 };
 }
 

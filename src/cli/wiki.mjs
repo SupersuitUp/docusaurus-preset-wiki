@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { OWNED } from './owned.mjs';
+import { pillowPython, NO_PILLOW } from './pillow-python.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = process.cwd();
@@ -20,12 +21,12 @@ function node(script, ...args) {
 }
 
 function python(script, ...args) {
-  const probe = spawnSync('python3', ['--version']);
-  if (probe.status !== 0) {
-    console.error(`[wiki] ${script} needs python3 on PATH (with Pillow; \`uv run --with pillow python3\` also works).`);
+  const py = pillowPython();
+  if (!py) {
+    console.error(`[wiki] ${script}: ${NO_PILLOW}.`);
     return 1;
   }
-  const r = spawnSync('python3', [join(HERE, 'python', script), ...args], { cwd: ROOT, stdio: 'inherit' });
+  const r = spawnSync(py[0], [...py.slice(1), join(HERE, 'python', script), ...args], { cwd: ROOT, stdio: 'inherit' });
   return r.status ?? 1;
 }
 

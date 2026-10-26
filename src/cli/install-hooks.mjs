@@ -4,8 +4,9 @@
 //   wiki install-hooks        idempotent; an instance's `prepare` script runs it on every install
 //   wiki install-hooks --print show the hook body and exit
 //
-// One hook, one job: `wiki refresh-dates` before every commit, so the snapshot production
-// reads for Created / Updated lags HEAD by one commit at most. Worktrees share the hooks
+// Two hooks, one job: `wiki refresh-dates` before every commit, so the snapshot production
+// reads for Created / Updated lags HEAD by one commit at most, and a post-commit settle that
+// leaves the tree clean afterwards (see settleBlock). Worktrees share the hooks
 // directory, so a branch made in one refreshes it too. An existing hook is kept: the block
 // between the markers is added or replaced, nothing outside it is touched. Never fails an
 // install: a machine with no git (a tarball, a Vercel build of an exported tree) just says so.
@@ -31,9 +32,33 @@ export function hookBlock(prefix = '') {
   ].join('\n');
 }
 
+// THE SETTLE HALF. The house rule is `git commit -- <files>`. For such a commit git runs the
+// pre-commit hook against a TEMPORARY index (GIT_INDEX_FILE=.git/next-index-*.lock), so the
+// snapshot refresh-dates stages lands in that index and rides in the commit, as intended, while
+// the REAL index keeps the old snapshot. After every commit the tree then read staged AND
+// modified on the snapshot and `git pull --rebase` refused (supersuit-wiki#14). The pre-commit
+// hook cannot fix it: git holds the real index's lock for the whole commit. So a post-commit
+// block points the snapshot's index entry back at HEAD, and only when the working copy matches
+// HEAD, so a snapshot that differs from what was committed is never touched.
+export const SETTLE_BEGIN = '# >>> @supersuit/docusaurus-preset-wiki settle-snapshot >>>';
+export const SETTLE_END = '# <<< @supersuit/docusaurus-preset-wiki settle-snapshot <<<';
+
+/** The post-commit lines this package owns. `prefix` is the wiki's path under the repo root. */
+export function settleBlock(prefix = '') {
+  return [
+    SETTLE_BEGIN,
+    '# A `git commit -- <files>` commits the refreshed snapshot from a temporary index and leaves',
+    '# the real index holding the old one. Once the commit exists, match the index to HEAD when the',
+    '# working copy already does. Installed by `wiki install-hooks`.',
+    `f="${prefix}src/data/changelog-events.json"`,
+    'if git cat-file -e "HEAD:$f" 2>/dev/null && git diff --quiet HEAD -- "$f" 2>/dev/null; then git reset -q -- "$f" >/dev/null 2>&1 || true; fi',
+    SETTLE_END,
+  ].join('\n');
+}
+
 /** The hook file with our block added or replaced; a fresh file when `existing` is empty. */
-export function mergeHook(existing, block) {
-  const re = new RegExp(`${escape(BEGIN)}[\\s\\S]*?${escape(END)}`);
+export function mergeHook(existing, block, begin = BEGIN, end = END) {
+  const re = new RegExp(`${escape(begin)}[\\s\\S]*?${escape(end)}`);
   if (existing && re.test(existing)) return existing.replace(re, block);
   if (existing && existing.trim()) return `${existing.replace(/\s*$/, '')}\n\n${block}\n`;
   return `#!/bin/sh\n${block}\n`;
@@ -97,24 +122,30 @@ export function installHooks({ root = process.cwd(), log = console.log } = {}) {
     return 0;
   }
   installMergeDriver(root, prefix);
-  const file = join(hooksDir, 'pre-commit');
-  const existing = existsSync(file) ? readFileSync(file, 'utf8') : '';
-  const next = mergeHook(existing, hookBlock(prefix));
-  if (next === existing) {
-    log(`[install-hooks] pre-commit hook already current (${file})`);
-    return 0;
+  const hooks = [
+    ['pre-commit', hookBlock(prefix), BEGIN, END],
+    ['post-commit', settleBlock(prefix), SETTLE_BEGIN, SETTLE_END],
+  ];
+  for (const [name, block, begin, end] of hooks) {
+    const file = join(hooksDir, name);
+    const existing = existsSync(file) ? readFileSync(file, 'utf8') : '';
+    const next = mergeHook(existing, block, begin, end);
+    if (next === existing) {
+      log(`[install-hooks] ${name} hook already current (${file})`);
+      continue;
+    }
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, next);
+    chmodSync(file, 0o755);
+    log(`[install-hooks] ${name} hook ${existing ? 'updated' : 'written'}: ${file}`);
   }
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, next);
-  chmodSync(file, 0o755);
-  log(`[install-hooks] pre-commit hook ${existing ? 'updated' : 'written'}: ${file}`);
   return 0;
 }
 
 const isMain = isDirectRun(import.meta.url);
 if (isMain) {
   if (process.argv.includes('--print')) {
-    console.log(hookBlock());
+    console.log(`${hookBlock()}\n\n${settleBlock()}`);
     process.exit(0);
   }
   process.exit(installHooks());

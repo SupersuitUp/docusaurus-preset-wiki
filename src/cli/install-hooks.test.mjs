@@ -115,3 +115,60 @@ test('a real page conflict still stops the merge', () => {
   g('checkout', '-q', 'main'); writeFileSync(join(r, 'page.md'), 'm\n'); g('commit', '-qam', 'p');
   assert.notEqual(merge(r).status, 0);
 });
+
+// The settle half (supersuit-wiki#14): a pathspec commit, the house rule, leaves the tree clean.
+// The pre-commit hook here is the real installed one; `wiki` is a stand-in that does what
+// refresh-dates does under a hook: rewrite the snapshot and `git add` it.
+import { chmodSync } from 'node:fs';
+import { SETTLE_BEGIN, settleBlock } from './install-hooks.mjs';
+
+function hookedWiki() {
+  const r = mkdtempSync(join(tmpdir(), 'settle-'));
+  const g = (...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...a], { cwd: r, encoding: 'utf8' });
+  g('init', '-q', '-b', 'main');
+  mkdirSync(join(r, 'src/data'), { recursive: true });
+  mkdirSync(join(r, 'docs'));
+  writeFileSync(join(r, 'src/data/changelog-events.json'), '{"n":0}\n');
+  writeFileSync(join(r, 'docs/a.md'), 'a\n'); writeFileSync(join(r, 'docs/b.md'), 'b\n');
+  g('add', '.'); g('commit', '-qm', 'base');
+  mkdirSync(join(r, 'node_modules/.bin'), { recursive: true });
+  const shim = join(r, 'node_modules/.bin/wiki');
+  writeFileSync(shim, '#!/bin/sh\n[ "$1" = refresh-dates ] || exit 0\nn=$(git rev-list --count HEAD)\necho "{\\"n\\":$n}" > src/data/changelog-events.json\ngit add -- src/data/changelog-events.json\n');
+  chmodSync(shim, 0o755);
+  writeFileSync(join(r, '.git/info/exclude'), 'node_modules\n');
+  assert.equal(installHooks({ root: r, log: () => {} }), 0);
+  return { r, g };
+}
+
+test('a `git commit -- <files>` carries the refreshed snapshot and leaves no staged-and-modified snapshot behind', () => {
+  const { r, g } = hookedWiki();
+  writeFileSync(join(r, 'docs/a.md'), 'a2\n');
+  writeFileSync(join(r, 'docs/b.md'), 'b2\n'); g('add', 'docs/b.md'); // someone else's staged work
+  g('commit', '-q', '-m', 'a only', '--', 'docs/a.md');
+  assert.deepEqual(g('show', '--name-only', '--format=', 'HEAD').trim().split('\n').sort(), ['docs/a.md', 'src/data/changelog-events.json'],
+    'the commit should hold the named file and the refreshed snapshot, nothing else');
+  assert.equal(g('show', 'HEAD:src/data/changelog-events.json'), '{"n":1}\n');
+  assert.equal(g('status', '--porcelain'), 'M  docs/b.md\n', 'the snapshot is left dirty, or the other staged file was disturbed');
+});
+
+test('the settle never touches a snapshot whose working copy differs from HEAD', () => {
+  const { r, g } = hookedWiki();
+  writeFileSync(join(r, 'src/data/changelog-events.json'), '{"n":"staged"}\n'); g('add', 'src/data/changelog-events.json');
+  writeFileSync(join(r, 'src/data/changelog-events.json'), '{"n":"edited"}\n');
+  execFileSync('sh', [join(r, '.git/hooks/post-commit')], { cwd: r });
+  assert.equal(g('status', '--porcelain'), 'MM src/data/changelog-events.json\n');
+  assert.equal(g('show', ':src/data/changelog-events.json'), '{"n":"staged"}\n');
+});
+
+test('installHooks writes the settle into post-commit, once, beside an existing post-commit', () => {
+  const root = mkdtempSync(join(tmpdir(), 'hooks-post-'));
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: root });
+  writeFileSync(join(root, '.git/hooks/post-commit'), '#!/bin/sh\necho theirs\n');
+  installHooks({ root, log: () => {} });
+  installHooks({ root, log: () => {} });
+  const body = readFileSync(join(root, '.git/hooks/post-commit'), 'utf8');
+  assert.ok(body.startsWith('#!/bin/sh\necho theirs'));
+  assert.equal(body.split(SETTLE_BEGIN).length, 2);
+  assert.ok(statSync(join(root, '.git/hooks/post-commit')).mode & 0o111, 'executable');
+  assert.ok(settleBlock('wiki/').includes('f="wiki/src/data/changelog-events.json"'), 'a wiki in a subdirectory names its own snapshot');
+});

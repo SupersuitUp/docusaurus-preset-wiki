@@ -5,6 +5,28 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.21.0 (2026-10-26)
+
+**Superlinks: a wiki article sent to one person as a link that knows which link it is.** The
+one-page share named the page and nobody, so every share read was anonymous and a link could only
+be shut by rotating the secret, which shut them all. Superlinks step 4 (Gary's design, approved
+2026-10-26).
+
+- `/s/mint?path=<route>&to=<name>[&forward=off|signed-in|open][&group=1]` mints a superlink for an
+  authorized reader on a gated wiki; refused 403 on an open wiki, 400 for a bad name or setting.
+- `/s/<rid>.<parent>.<f><exp>.<sig>/<route>` serves the one-article view (a member is redirected to
+  the page); the read event carries `link: { rid, parent? }` and `reader: "link:<rid>"`.
+- A `mint` read event carries `link: { rid, label }` to the sink: the only place the name goes.
+- `superlinks.shut` in `wiki.config.json` (or `shut` on `createMiddleware`): a listed id, and every
+  link forwarded from it, answers 410. Expired links answer 410 too.
+- `wiki share <route> --to NAME [--group] [--forward ...]`; never falls back to the whole-wiki link.
+- DETECTOR: `wiki share /x --to Someone` prints "unknown argument" or a `?key=` link, or a share read
+  event has no `link`.
+- REMEDY: bump the package; add `superlinks: { shut: [] }` to `wiki.config.json` when a link must be shut.
+- Tests: src/share/superlink.test.ts, src/share/handleShare.test.ts (superlink serving, 410, named
+  mints), src/analytics/reads.test.ts (a read names the link; a mint names the person once),
+  src/cli/unlock-link.test.mjs (`--to`).
+
 ## 1.20.1 (2026-10-23)
 
 **A machine without Pillow no longer stops the image tools.** `wiki hero` publish, `wiki icons` and `wiki optimize-images` used to refuse when python3 could not import Pillow (macOS's never can) and print a uv recipe for a person to retype. They now run through `uv run --with pillow python3` when uv is on PATH, and only refuse when neither works. One helper, `src/cli/pillow-python.mjs`, decides for every caller. Earned when two wiki publishes in one evening hit a missing Pillow.

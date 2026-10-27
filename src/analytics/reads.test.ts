@@ -247,3 +247,33 @@ test('the theme registers the beacon as a client module, outside the theme path'
   const mods = (wikiTheme({} as never).getClientModules?.() ?? []) as string[];
   assert.ok(mods.some((m) => m.endsWith(path.join('analytics', 'client.js'))), mods.join(', '));
 });
+
+test('a read through a superlink names the link, never a person, and a shut one is not counted (superlinks step 4)', async () => {
+  const { mintSuperlink } = await import('../share/superlink');
+  const r = recorder();
+  const m = (await mintSuperlink(SECRET, '/concepts/x', { forward: 'off' }))!;
+  const mw = accountMw(r.fetchImpl, { secret: SECRET });
+  await mw(new Request(`https://t.wiki${m.path}`, { headers: { 'user-agent': 'Mozilla/5.0' } }));
+  const evs = r.events();
+  assert.equal(evs.length, 1);
+  assert.equal(evs[0].kind, 'share');
+  assert.equal(evs[0].reader, `link:${m.rid}`);
+  assert.deepEqual(evs[0].link, { rid: m.rid });
+  const shut = accountMw(r.fetchImpl, { secret: SECRET, shut: [m.rid] });
+  const res = await shut(new Request(`https://t.wiki${m.path}`, { headers: { 'user-agent': 'Mozilla/5.0' } }));
+  assert.equal(res!.status, 410);
+  assert.equal(r.events().length, 1, 'a shut link is not a read');
+});
+
+test('a named mint is reported to the sink once, with who it is for; nothing else ever carries the name', async () => {
+  const r = recorder();
+  const mw = accountMw(r.fetchImpl, { secret: SECRET });
+  const res = await mw(new Request('https://t.wiki/s/mint?path=/concepts/x&to=Tim%20Dort-Golts', { headers: { 'user-agent': 'Mozilla/5.0', cookie: await grant('u1') } }));
+  const body = await res!.json();
+  const evs = r.events();
+  assert.equal(evs.length, 1);
+  assert.equal(evs[0].kind, 'mint');
+  assert.equal(evs[0].path, '/concepts/x');
+  assert.equal(evs[0].reader, 'u1', 'who minted it');
+  assert.deepEqual(evs[0].link, { rid: body.rid, label: 'Tim Dort-Golts' });
+});

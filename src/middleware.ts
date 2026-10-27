@@ -22,6 +22,7 @@
 // EDGE-SAFE: this file and src/share/* import no Node built-in. Vercel's edge bundler refuses them.
 
 import { handleShare, type ShareRequest } from './share/handleShare';
+import { canonicalRoute } from './share/signedRoute';
 import matcherJson from './cli/matcher.json';
 import { handleSignOut } from './gate/signOut';
 import { gateFromConfig as gateFromConfigFn, shareAdminsFromConfig, type WikiGateConfig as WikiGateConfigShape } from './gate/fromConfig';
@@ -70,6 +71,8 @@ export interface MiddlewareOptions {
   /** Who may mint share links (src/share/handleShare.ts). Absent: every authorized reader. A
    *  function is read per request, since the list lives in the deployment's env. */
   shareAdmins?: readonly string[] | (() => readonly string[] | undefined);
+  /** Superlink ids that no longer open: `superlinks.shut` in wiki.config.json. */
+  shut?: readonly string[];
 }
 
 export {
@@ -146,14 +149,27 @@ export function createMiddleware(opts: MiddlewareOptions = {}) {
       gated,
       reader: verdict.reader,
       shareAdmins: typeof opts.shareAdmins === 'function' ? opts.shareAdmins() ?? [] : opts.shareAdmins,
+      shut: opts.shut,
     });
     if (share) {
+      // A named superlink was minted: the one moment who it is for is written down, to the
+      // operator's own sink, so a read through it can name the link alone (superlinks step 4).
+      const minted = share.headers.get('x-wiki-superlink-minted');
+      if (sink && minted) {
+        const u = new URL(request.url);
+        const route = canonicalRoute(u.searchParams.get('path') ?? '');
+        const group = u.searchParams.get('group') === '1';
+        if (route) await report(buildEvent(request, { kind: 'mint', path: route, reader: verdict.reader ?? 'key',
+          link: { rid: minted, label: (u.searchParams.get('to') ?? '').trim(), ...(group ? { group: true } : {}) } }));
+      }
       // A served mirror is a read the beacon cannot see: the mirror runs no script.
       const rewrite = share.headers.get('x-middleware-rewrite');
       if (sink && rewrite && !isUnfurlBot && !isPrefetch(request)) {
         const mirrored = new URL(rewrite).pathname.replace(/^\/share-view/, '') || '/';
         const path = sameSiteRoute(mirrored, new URL(request.url).host);
-        if (path) await report(buildEvent(request, { kind: 'share', path, reader: 'share', ref: request.headers.get('referer') }));
+        const [rid, parent] = (share.headers.get('x-wiki-superlink') ?? '').split(' ');
+        const link = rid ? { rid, ...(parent ? { parent } : {}) } : undefined;
+        if (path) await report(buildEvent(request, { kind: 'share', path, reader: rid ? `link:${rid}` : 'share', ref: request.headers.get('referer'), link }));
       }
       return share;
     }
@@ -219,6 +235,6 @@ export type { WikiGateConfig, WikiGateType } from './gate/fromConfig';
  *   import wiki from './wiki.config.json';
  *   export default createMiddlewareFromConfig(wiki);
  */
-export function createMiddlewareFromConfig(wiki: { gate?: WikiGateConfigShape; analytics?: AnalyticsOption }) {
-  return createMiddleware({ gate: gateFromConfigFn(wiki.gate), analytics: wiki.analytics, shareAdmins: shareAdminsFromConfig(wiki.gate) });
+export function createMiddlewareFromConfig(wiki: { gate?: WikiGateConfigShape; analytics?: AnalyticsOption; superlinks?: { shut?: readonly string[] } }) {
+  return createMiddleware({ gate: gateFromConfigFn(wiki.gate), analytics: wiki.analytics, shareAdmins: shareAdminsFromConfig(wiki.gate), shut: wiki.superlinks?.shut });
 }

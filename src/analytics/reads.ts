@@ -37,7 +37,7 @@ export const READ_SIG_LABEL = 'wiki-read:v1:';
 export const MAX_BEACON_BYTES = 2048;
 export const NO_WAIT_CAP_MS = 800;
 
-export type ReadKind = 'read' | 'door' | 'share';
+export type ReadKind = 'read' | 'door' | 'share' | 'mint';
 
 export interface ReadEvent {
   v: 1;
@@ -50,6 +50,10 @@ export interface ReadEvent {
   at: string;
   country?: string;
   device: 'mobile' | 'desktop';
+  /** The superlink a share read came through, or a mint created (superlinks step 4). `label` is
+   *  who it is for, and appears ONLY on a `mint` event, which the minter sends to the operator's
+   *  own sink; a read names the id alone. */
+  link?: { rid: string; parent?: string; label?: string; group?: boolean };
 }
 
 /** `analytics` in wiki.config.json: absent/true = the default, false = off, or a named sink. */
@@ -139,6 +143,7 @@ export interface EventParts {
   title?: unknown;
   ref?: unknown;
   now?: Date;
+  link?: ReadEvent['link'];
 }
 
 /** One event, from the request and the parts the caller knows. Nothing here reads a cookie. */
@@ -158,6 +163,7 @@ export function buildEvent(request: Request, parts: EventParts): ReadEvent {
   if (ref) event.ref = ref;
   const country = request.headers.get('x-vercel-ip-country');
   if (country && /^[A-Z]{2}$/.test(country)) event.country = country;
+  if (parts.link?.rid) event.link = { ...parts.link };
   return event;
 }
 

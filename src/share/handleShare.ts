@@ -25,6 +25,7 @@
 // excludes /img/ and /assets/ from its matcher.
 
 import { MINT_PATH, canonicalRoute, sharePath, shareViewPath, verifySharePath } from './signedRoute';
+import { verifySuperlink, mintSuperlink, type ForwardMode } from './superlink';
 
 export interface ShareRequest {
   url: URL;
@@ -41,7 +42,12 @@ export interface ShareRequest {
    *  and an empty list admits nobody, so a missing variable fails CLOSED. Share addresses
    *  already minted keep opening: this limits who makes links, never who follows them. */
   shareAdmins?: readonly string[];
+  /** Superlink ids that no longer open (wiki.config.json `superlinks.shut`). A shut id also shuts
+   *  every link forwarded from it. */
+  shut?: readonly string[];
 }
+
+const GONE = '<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><title>Link closed</title><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:20vh auto;padding:0 1.5rem;line-height:1.6"><p>This link is no longer available.</p></body>';
 
 function json(status: number, body: unknown, extra: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -62,11 +68,45 @@ export async function handleShare(req: ShareRequest): Promise<Response | undefin
     if (shareAdmins !== undefined && !(reader && reader !== 'key' && shareAdmins.includes(reader))) {
       return json(403, { error: 'not_share_admin' });
     }
+    // A superlink for one named person (superlinks step 4). Gated wikis only: on an open wiki
+    // every visitor reads as authorized, so anyone could write a made-up name into the
+    // operator's reads. The name goes to the reads sink in the mint event, never into the link.
+    const to = url.searchParams.get('to');
+    if (to !== null) {
+      const label = to.trim();
+      if (!label || label.length > 60 || /[\r\n]/.test(label)) return json(400, { error: 'bad_name' });
+      const fwd = url.searchParams.get('forward') ?? 'off';
+      if (!['off', 'signed-in', 'open'].includes(fwd)) return json(400, { error: 'bad_forward' });
+      if (!gated) return json(403, { error: 'superlinks_need_a_gate', why: 'an open wiki cannot tell who is minting' });
+      if (!secret) return json(503, { error: 'sharing_disabled', why: 'no WIKI_SHARE_SECRET or WIKI_GATE_SECRET on this deployment' });
+      const m = await mintSuperlink(secret, route, { forward: fwd as ForwardMode });
+      if (!m) return json(400, { error: 'bad_path' });
+      return json(200, { url: new URL(m.path, url.origin).toString(), focused: true, superlink: true, rid: m.rid },
+        { 'x-wiki-superlink-minted': m.rid });
+    }
     if (!gated) return json(200, { url: new URL(route, url.origin).toString(), focused: false });
     if (!secret) return json(503, { error: 'sharing_disabled', why: 'no WIKI_SHARE_SECRET or WIKI_GATE_SECRET on this deployment' });
     const path = await sharePath(secret, route);
     if (!path) return json(400, { error: 'bad_path' });
     return json(200, { url: new URL(path, url.origin).toString(), focused: true });
+  }
+
+  // A superlink is tried first: its token has dots, so it can never parse as a one-page share.
+  const link = await verifySuperlink(secret, url.pathname, { shut: req.shut });
+  if (link && link.state !== 'open') {
+    return new Response(GONE, { status: 410, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' } });
+  }
+  if (link) {
+    // A member of a gated wiki reads the page as a member. Everyone else, on an open wiki too,
+    // gets the one-article view, so the read is counted against the link it came through.
+    if (authorized && gated) return Response.redirect(new URL(link.route, url.origin), 302);
+    return new Response(null, {
+      headers: {
+        'x-middleware-rewrite': new URL(shareViewPath(link.route), url.origin).toString(),
+        'x-robots-tag': 'noindex, nofollow',
+        'x-wiki-superlink': link.parent ? `${link.rid} ${link.parent}` : link.rid,
+      },
+    });
   }
 
   const route = await verifySharePath(secret, url.pathname);

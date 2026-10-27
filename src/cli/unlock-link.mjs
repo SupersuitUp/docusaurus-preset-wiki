@@ -125,8 +125,16 @@ export function shareMechanism(root = ROOT) {
 /** Ask a wiki's edge for the focused share link of one route, as an authorized reader.
  *  `cookie` is the jar the ?key= unlock produced; without it the edge answers 401. Returns the
  *  url, or null with the reason, and never throws. */
-export async function mintFocusedLink(base, route, cookie, fetchImpl = fetch) {
-  const url = `${base}/s/mint?path=${encodeURIComponent(route)}`;
+export async function mintFocusedLink(base, route, cookie, fetchImpl = fetch, superlink = null) {
+  // With `superlink` ({ to, forward?, group? }) the edge mints that person's own link and writes
+  // who it is for to the wiki's reads sink; the link itself never carries the name.
+  const q = new URLSearchParams({ path: route });
+  if (superlink?.to) {
+    q.set("to", superlink.to);
+    if (superlink.forward) q.set("forward", superlink.forward);
+    if (superlink.group) q.set("group", "1");
+  }
+  const url = superlink?.to ? `${base}/s/mint?${q}` : `${base}/s/mint?path=${encodeURIComponent(route)}`;
   let r;
   try {
     r = await fetchImpl(url, { headers: { cookie, accept: "application/json" }, redirect: "manual" });
@@ -137,7 +145,7 @@ export async function mintFocusedLink(base, route, cookie, fetchImpl = fetch) {
   let body;
   try { body = await r.json(); } catch { return { url: null, why: "the mint endpoint did not answer JSON" }; }
   if (typeof body.url !== "string") return { url: null, why: "the mint endpoint answered without a url" };
-  return { url: body.url, focused: body.focused === true, why: null };
+  return { url: body.url, focused: body.focused === true, why: null, ...(body.superlink ? { superlink: true, rid: body.rid } : {}) };
 }
 
 /** The slug already serving this exact route, or null. Two slugs for one page means revoking
@@ -226,7 +234,8 @@ if (invokedDirectly) {
   const json = args.includes("--json");
   const route = args.find((a) => !a.startsWith("--"));
   if (!route) {
-    console.error("usage: unlock-link.mjs </route or full url> [--json] [--mint] [--whole-wiki]");
+    console.error("usage: unlock-link.mjs </route or full url> [--json] [--mint] [--whole-wiki] [--to NAME [--group] [--forward off|signed-in|open]]");
+    console.error("  --to: on a gated wiki, a superlink made for that one person: the read is counted against it, and the name never rides in the link.");
     console.error("  --mint: on a gated wiki that serves single pages from a committed /s/<slug> list, mint one, push it, and wait for it to answer.");
     console.error("  --whole-wiki: on a gated wiki with signed one-page shares, hand back the ?key= link that opens everything instead.");
     process.exit(2);
@@ -294,7 +303,9 @@ if (invokedDirectly) {
   if (out.outcome === UNLOCKED && share?.kind === "signed-route" && !args.includes("--whole-wiki")) {
     const base = siteUrl() || new URL(pageUrl).origin;
     const route = new URL(pageUrl).pathname;
-    const minted = await mintFocusedLink(base, route, keyed.jar || "");
+    const flag = (n) => { const i = args.indexOf(`--${n}`); return i === -1 ? undefined : args[i + 1]; };
+    const to = flag("to");
+    const minted = await mintFocusedLink(base, route, keyed.jar || "", fetch, to ? { to, forward: flag("forward"), group: args.includes("--group") } : null);
     if (minted.url && minted.focused) {
       const p = await probe(minted.url);
       if (opens(p)) {
@@ -306,6 +317,14 @@ if (invokedDirectly) {
     } else if (minted.why) {
       console.error(`  (could not mint a focused link: ${minted.why}; falling back to the ?${param}= link)`);
     }
+    // A link made for one person never falls back to the whole wiki: refuse instead.
+    if (to && !(minted.superlink && out.url === minted.url)) {
+      console.error(`refusing: could not make ${to}'s own link to ${route}${minted.why ? ` (${minted.why})` : ""}. Nothing to send.`);
+      process.exit(1);
+    }
+  } else if (args.includes("--to")) {
+    console.error(`refusing: --to makes a superlink, which needs a gated wiki whose edge mints them; this page is ${out.outcome}. Nothing to send.`);
+    process.exit(1);
   }
 
   // --mint is the remedy for MINTABLE, and it is a flag rather than automatic because it

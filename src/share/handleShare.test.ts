@@ -82,3 +82,55 @@ test('share admins restrict minting only: a link an admin already made still ope
   const r = (await req(await sharePath(SECRET, '/concepts/x') as string, { shareAdmins: ['gary'] }))!;
   assert.match(r.headers.get('x-middleware-rewrite') ?? '', /share-view\/concepts\/x/);
 });
+
+// Superlinks (step 4): the same one-article view, plus which link it was, and "gone" for a shut one.
+import { mintSuperlink } from './superlink';
+
+test('superlink: an anonymous reader gets the one-article view, tagged with the link it came through', async () => {
+  const m = (await mintSuperlink(SECRET, '/concepts/x', { forward: 'off' }))!;
+  const r = (await req(m.path))!;
+  assert.equal(r.headers.get('x-middleware-rewrite'), `${ORIGIN}/share-view/concepts/x/`);
+  assert.equal(r.headers.get('x-wiki-superlink'), m.rid);
+});
+
+test('superlink: a member is sent to the page itself', async () => {
+  const m = (await mintSuperlink(SECRET, '/concepts/x', { forward: 'off' }))!;
+  const r = (await req(m.path, { authorized: true }))!;
+  assert.equal(r.status, 302);
+  assert.equal(r.headers.get('location'), `${ORIGIN}/concepts/x`);
+});
+
+test('superlink: a shut link, or one forwarded from it, answers 410 and shows nothing of the page', async () => {
+  const parent = (await mintSuperlink(SECRET, '/concepts/x', { forward: 'signed-in' }))!;
+  const child = (await mintSuperlink(SECRET, '/concepts/x', { forward: 'signed-in', parent: parent.rid }))!;
+  for (const p of [parent.path, child.path]) {
+    const r = (await handleShare({ url: new URL(p, ORIGIN), authorized: false, secret: SECRET, gated: true, shut: [parent.rid] }))!;
+    assert.equal(r.status, 410);
+    assert.equal(r.headers.get('x-middleware-rewrite'), null);
+    assert.match(await r.text(), /no longer available/);
+  }
+});
+
+test('superlink: a forged one falls through to the gate like any unknown path', async () => {
+  const m = (await mintSuperlink(SECRET, '/concepts/x', { forward: 'off' }))!;
+  assert.equal(await req(m.path.replace('/concepts/x', '/concepts/y')), undefined);
+});
+
+test('mint with to=: an authorized reader gets a superlink for that person; the name never appears in it', async () => {
+  const r = (await req('/s/mint?path=/concepts/x&to=Tim%20Dort-Golts', { authorized: true }))!;
+  assert.equal(r.status, 200);
+  const body = await r.json();
+  assert.equal(body.superlink, true);
+  assert.match(body.rid, /^[a-z0-9]{12}$/);
+  assert.ok(!/tim/i.test(body.url));
+  assert.equal(r.headers.get('x-wiki-superlink-minted'), body.rid);
+  const opened = (await req(new URL(body.url).pathname))!;
+  assert.equal(opened.headers.get('x-wiki-superlink'), body.rid);
+});
+
+test('mint with to=: refused unauthorized, refused on an open wiki, refused a bad name', async () => {
+  assert.equal((await req('/s/mint?path=/concepts/x&to=Tim'))!.status, 401);
+  assert.equal((await req('/s/mint?path=/concepts/x&to=Tim', { authorized: true, gated: false }))!.status, 403);
+  assert.equal((await req(`/s/mint?path=/concepts/x&to=${'x'.repeat(61)}`, { authorized: true }))!.status, 400);
+  assert.equal((await req('/s/mint?path=/concepts/x&to=Tim&forward=sideways', { authorized: true }))!.status, 400);
+});

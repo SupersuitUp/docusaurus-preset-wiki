@@ -267,3 +267,12 @@ test("a redirect that lands on a sign-in page is not an open page, even at 200",
   assert.equal(opens({ status: 302, setsCookie: true, offPage: true }), false);
   assert.equal(opens({ status: 200, offPage: false }), true);
 });
+
+test("mintFocusedLink with a name asks the edge for that person's superlink (superlinks step 4)", async () => {
+  let asked;
+  const ok = async (url) => { asked = url; return new Response(JSON.stringify({ url: "https://example.wiki/s/abc/concepts/thing", focused: true, superlink: true, rid: "abcdefghijkl" }), { status: 200 }); };
+  const m = await mintFocusedLink("https://example.wiki", "/concepts/thing", "wiki_gate=t", ok, { to: "Tim Dort-Golts", forward: "off" });
+  assert.equal(asked, "https://example.wiki/s/mint?path=%2Fconcepts%2Fthing&to=Tim+Dort-Golts&forward=off");
+  assert.equal(m.rid, "abcdefghijkl");
+  assert.equal(m.superlink, true);
+});

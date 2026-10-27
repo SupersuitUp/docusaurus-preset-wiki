@@ -23,6 +23,8 @@ export interface WikiConfig {
   };
   /** Reader analytics (src/analytics/reads.ts). false turns it off; an object names the sink. */
   analytics?: boolean | { endpoint?: string };
+  /** Superlinks (1.21.0): ids that no longer open; a shut id shuts every link forwarded from it. */
+  superlinks?: { shut?: string[] };
   og?: { bg?: string; accent?: string; text?: string; muted?: string };
   /** Which middleware matcher literal the instance carries (src/cli/matcher.mjs). */
   matcher?: 'default' | 'skills-are-pages';

@@ -136,6 +136,11 @@
           "type": "string",
           "description": "freedom-account only. The NAME of an environment variable holding the account ids that may make one-page share links, comma-separated (e.g. WIKI_SHARE_ADMINS). Set: only those accounts get a link from the Share button, and an empty or missing variable lets nobody make one. Absent: every admitted reader can. Links already made keep opening."
         },
+        "mode": {
+          "type": "string",
+          "enum": ["read", "act"],
+          "description": "freedom-account only. `read` (default): every page is behind the sign-in door. `act`: every page is readable by anyone with no door, and a reader signs in with their Supersuit account only to ACT, which today means minting a share link or superlink from the Share button (https://hypercontext.wiki/standards/superlink/v1: reading never needs sign-in, acting does). A mint with no sign-in goes to signInUrl and returns to the page."
+        },
         "grantDays": {
           "type": "number",
           "description": "freedom-account only. How long one sign-in lasts. Default 7."

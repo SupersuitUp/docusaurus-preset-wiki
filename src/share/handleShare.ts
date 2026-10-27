@@ -45,7 +45,16 @@ export interface ShareRequest {
   /** Superlink ids that no longer open (wiki.config.json `superlinks.shut`). A shut id also shuts
    *  every link forwarded from it. */
   shut?: readonly string[];
+  /** The request's Accept header: JSON gets a 401 naming the sign-in, anything else a 303. */
+  accept?: string | null;
+  /** The gate's `cannotAct` (act mode): this reader may read but not mint. */
+  cannotAct?: { signInUrl: string } | { refused: 'not_allowed' };
 }
+
+/** Where a reader who must sign in to act goes back to: the page, marked so the Share button
+ *  finishes the mint it started (src/theme/ShareButton). The portal returns them with a pass,
+ *  the gate redeems it and keeps the marker. */
+export const ACT_RETURN_PARAM = 'act';
 
 const GONE = '<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><title>Link closed</title><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:20vh auto;padding:0 1.5rem;line-height:1.6"><p>This link is no longer available.</p></body>';
 
@@ -65,6 +74,16 @@ export async function handleShare(req: ShareRequest): Promise<Response | undefin
     const route = canonicalRoute(url.searchParams.get('path') ?? '');
     if (route === null) return json(400, { error: 'bad_path' });
     if (!authorized) return json(401, { error: 'not_authorized' });
+    if (req.cannotAct) {
+      if ('refused' in req.cannotAct) return json(403, { error: req.cannotAct.refused });
+      const back = new URL(route, url.origin);
+      back.searchParams.set(ACT_RETURN_PARAM, 'share');
+      const signIn = `${req.cannotAct.signInUrl}?to=${encodeURIComponent(back.toString())}`;
+      // The Share button asks with fetch, which cannot follow a cross-site redirect into a
+      // sign-in page, so it is told where to go; a navigation is simply sent there.
+      if (/application\/json/.test(req.accept ?? '')) return json(401, { error: 'sign_in_to_act', signIn });
+      return new Response(null, { status: 303, headers: { location: signIn, 'cache-control': 'no-store' } });
+    }
     if (shareAdmins !== undefined && !(reader && reader !== 'key' && shareAdmins.includes(reader))) {
       return json(403, { error: 'not_share_admin' });
     }
@@ -97,9 +116,10 @@ export async function handleShare(req: ShareRequest): Promise<Response | undefin
     return new Response(GONE, { status: 410, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' } });
   }
   if (link) {
-    // A member of a gated wiki reads the page as a member. Everyone else, on an open wiki too,
+    // A member of a gated wiki reads the page as a member. In act mode a reader who cannot act
+    // is anybody, so they get the one-article view and the read counts against the link. Everyone else, on an open wiki too,
     // gets the one-article view, so the read is counted against the link it came through.
-    if (authorized && gated) return Response.redirect(new URL(link.route, url.origin), 302);
+    if (authorized && gated && !req.cannotAct) return Response.redirect(new URL(link.route, url.origin), 302);
     return new Response(null, {
       headers: {
         'x-middleware-rewrite': new URL(shareViewPath(link.route), url.origin).toString(),
@@ -112,7 +132,7 @@ export async function handleShare(req: ShareRequest): Promise<Response | undefin
   const route = await verifySharePath(secret, url.pathname);
   if (route === null) return undefined;
 
-  if (authorized || !gated) {
+  if ((authorized && !req.cannotAct) || !gated) {
     return Response.redirect(new URL(route, url.origin), 302);
   }
   return new Response(null, {

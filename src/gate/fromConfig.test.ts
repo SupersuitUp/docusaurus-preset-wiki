@@ -128,3 +128,20 @@ test('gate.door.theme reaches the door, and an unknown theme is refused at build
     assert.throws(() => gateFromConfig({ type: 'freedom-account', door: { theme: 'neon' as never } }), /door\.theme/);
   });
 });
+
+test('gate.mode "act" on a freedom-account wiki: pages open with no door, minting asks for sign-in', async () => {
+  await withEnv({ WIKI_PASS_SECRET: 's', WIKI_GATE_SECRET: 's' }, async () => {
+    const mw = createMiddlewareFromConfig({ gate: { type: 'freedom-account', mode: 'act', signInUrl: 'https://p.example/in' }, analytics: false });
+    assert.equal(await mw(req('https://t.wiki/concepts/x')), undefined, 'readable');
+    const mint = await mw(req('https://t.wiki/s/mint?path=/concepts/x'));
+    assert.equal(mint?.status, 303);
+    assert.match(mint!.headers.get('location') ?? '', /^https:\/\/p\.example\/in\?to=/);
+    const read = createMiddlewareFromConfig({ gate: { type: 'freedom-account', mode: 'read' }, analytics: false });
+    assert.equal((await read(req('https://t.wiki/concepts/x')))?.status, 401, 'read mode is the door');
+  });
+});
+
+test('gate.mode is refused when unknown, and on a gate type that has no modes', () => {
+  assert.throws(() => gateFromConfig({ type: 'freedom-account', mode: 'acts' as never }), /gate\.mode "acts"/);
+  assert.throws(() => gateFromConfig({ type: 'password', mode: 'act' }), /gate\.mode.*freedom-account/);
+});

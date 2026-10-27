@@ -326,3 +326,73 @@ test('an empty door body draws no line at all, so a door can be one sentence and
   assert.doesNotMatch(door, /invited with/, 'the default line does not come back');
   assert.match(door, /class="button"[^>]*>Sign in</);
 });
+
+// ACT MODE (Gary, 2026-10-27): the wiki is public to READ; signing in is only to ACT, which today
+// means minting a share or superlink. Standard: https://hypercontext.wiki/standards/superlink/v1
+const actMw = (fetchImpl?: typeof fetch) => createMiddleware({
+  gate: createFreedomAccountGate({ signInUrl: SIGN_IN, secret: SECRET, mode: 'act' }), secret: SECRET,
+  ...(fetchImpl ? { fetch: fetchImpl, analytics: { secret: SECRET } } : { analytics: false }),
+});
+const grantFor = async (uid: string) => `fw_gate=${await grantCookieValue(SECRET, uid, Math.floor(Date.now() / 1000) + 600)}`;
+
+test('act mode (a): a page is readable with no cookie, no door, no knock', async () => {
+  assert.equal(await actMw()(req('https://t.wiki/concepts/x')), undefined);
+  assert.equal(await actMw()(req('https://t.wiki/')), undefined);
+});
+
+test('act mode (b): minting with no grant goes to sign-in, returning to the page', async () => {
+  const back = encodeURIComponent('https://t.wiki/concepts/x?act=share');
+  // A navigation is redirected to the same sign-in the read-mode door uses.
+  const nav = await actMw()(req('https://t.wiki/s/mint?path=/concepts/x'));
+  assert.equal(nav?.status, 303);
+  assert.equal(nav!.headers.get('location'), `${SIGN_IN}?to=${back}`);
+  // The Share button's fetch cannot follow a cross-site redirect, so it is told where to go.
+  const api = await actMw()(new Request('https://t.wiki/s/mint?path=/concepts/x&to=Tim', { headers: { 'user-agent': 'Mozilla/5.0', accept: 'application/json' } }));
+  assert.equal(api?.status, 401);
+  assert.deepEqual(await api!.json(), { error: 'sign_in_to_act', signIn: `${SIGN_IN}?to=${back}` });
+});
+
+test('act mode (b): on return the pass is redeemed and keeps the return marker, so the mint can proceed', async () => {
+  const pass = await mintPass(SECRET, 'abc', Math.floor(Date.now() / 1000) + 300);
+  const res = await actMw()(req(`https://t.wiki/concepts/x?act=share&pass=${pass}`));
+  assert.equal(res?.status, 303);
+  assert.equal(res!.headers.get('location'), '/concepts/x?act=share');
+  assert.match(res!.headers.get('set-cookie') ?? '', /^fw_gate=v1\.abc\./);
+});
+
+test('act mode (c): a mint with a grant succeeds, and a forward link records its signed-in maker', async () => {
+  const sent: string[] = [];
+  const fetchImpl = (async (_u: unknown, init?: RequestInit) => { sent.push(String(init?.body)); return new Response(null, { status: 204 }); }) as typeof fetch;
+  const cookie = await grantFor('u1');
+  const plain = await actMw(fetchImpl)(req('https://t.wiki/s/mint?path=/concepts/x', { cookie }));
+  assert.equal(plain?.status, 200);
+  assert.equal((await plain!.json()).focused, true);
+  const named = await actMw(fetchImpl)(req('https://t.wiki/s/mint?path=/concepts/x&to=Tim&forward=signed-in', { cookie }));
+  assert.equal(named?.status, 200);
+  const body = await named!.json();
+  assert.equal(body.superlink, true);
+  const mint = sent.map((s) => JSON.parse(s)).find((e) => e.kind === 'mint');
+  assert.equal(mint.reader, 'u1', 'the maker is the signed-in reader');
+  assert.equal(mint.link.rid, body.rid);
+});
+
+test('act mode: a signed-in reader off the allowlist still reads, but cannot mint', async () => {
+  const mw = createMiddleware({ gate: createFreedomAccountGate({ signInUrl: SIGN_IN, secret: SECRET, mode: 'act', allow: ['u1'] }), secret: SECRET, analytics: false });
+  const cookie = await grantFor('u2');
+  assert.equal(await mw(req('https://t.wiki/concepts/x', { cookie })), undefined);
+  assert.equal((await mw(req('https://t.wiki/s/mint?path=/concepts/x', { cookie })))?.status, 403);
+});
+
+test('act mode: a share address sent to someone with no grant still opens the one-article view', async () => {
+  const cookie = await grantFor('u1');
+  const { url } = await (await actMw()(req('https://t.wiki/s/mint?path=/concepts/x', { cookie })))!.json();
+  const res = await actMw()(req(url));
+  assert.match(res!.headers.get('x-middleware-rewrite') ?? '', /\/share-view\/concepts\/x/);
+});
+
+test('read mode (d) is unchanged: mode "read" and no mode both meet the door, and mint is 401', async () => {
+  for (const mw of [gated(), gated({ mode: 'read' })]) {
+    assert.equal((await mw(req('https://t.wiki/concepts/x')))?.status, 401);
+    assert.equal((await mw(req('https://t.wiki/s/mint?path=/concepts/x')))?.status, 401);
+  }
+});

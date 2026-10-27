@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { linkForPage, mintAndCopy } from './mintAndCopy';
+import { linkForPage, mintAndCopy, actReturn } from './mintAndCopy';
 
 const URL_ = 'https://example.wiki/s/AAAAAAAAAAAAAAAAAAAAAA/concepts/x';
 
@@ -83,4 +83,21 @@ test('linkForPage says when the edge refused because the reader is not a share a
   const res = await linkForPage('https://example.wiki/concepts/x', async () =>
     new Response(JSON.stringify({ error: 'not_share_admin' }), { status: 403 }));
   assert.deepEqual(res, { url: 'https://example.wiki/concepts/x', focused: false, adminOnly: true });
+});
+
+test('linkForPage hands back the sign-in when an act-mode wiki wants the reader signed in to share', async () => {
+  const signIn = 'https://portal.example/in?to=https%3A%2F%2Fexample.wiki%2Fconcepts%2Fx%3Fact%3Dshare';
+  const res = await linkForPage('https://example.wiki/concepts/x', async () =>
+    new Response(JSON.stringify({ error: 'sign_in_to_act', signIn }), { status: 401 }));
+  assert.deepEqual(res, { url: 'https://example.wiki/concepts/x', focused: false, signIn });
+  // Only an https sign-in is followed; anything else is the plain fallback.
+  const bad = await linkForPage('https://example.wiki/concepts/x', async () =>
+    new Response(JSON.stringify({ error: 'sign_in_to_act', signIn: 'javascript:alert(1)' }), { status: 401 }));
+  assert.deepEqual(bad, { url: 'https://example.wiki/concepts/x', focused: false });
+});
+
+test('actReturn: a page reached back from sign-in with ?act=share asks to finish the share, and the marker comes off', () => {
+  assert.deepEqual(actReturn('https://example.wiki/concepts/x?act=share#h'), { finish: true, clean: '/concepts/x#h' });
+  assert.deepEqual(actReturn('https://example.wiki/concepts/x?a=1&act=share'), { finish: true, clean: '/concepts/x?a=1' });
+  assert.deepEqual(actReturn('https://example.wiki/concepts/x'), { finish: false, clean: '/concepts/x' });
 });

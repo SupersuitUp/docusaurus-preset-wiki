@@ -38,6 +38,14 @@
 // wiki where the default is wrong, such as one whose `/skills/` prefix is a docs reference and
 // only the `.md` files under it are for agents.
 //
+// TWO MODES (1.22.0). `read` (the default, unchanged): every page is behind the door. `act`: every
+// page is readable by anyone with no door, and signing in is only needed to ACT, which today means
+// minting a share link or a superlink (https://hypercontext.wiki/standards/superlink/v1: reading
+// never needs sign-in; acting does). An act-mode gate still redeems a pass or key, still honours a
+// grant and names its reader, and marks a reader who may read but not act with `cannotAct`, which
+// the share layer turns into the trip to sign-in and back. Gary approved it 2026-10-27 for the AI
+// wikis Continental Works owns: public to read, a Supersuit account to share.
+//
 // A MISSING SECRET FAILS OPEN with an `x-wiki-gate` header naming the misconfiguration, the
 // family's never-brick-the-wiki posture: preview deploys carry no secret.
 //
@@ -70,7 +78,13 @@ export interface AccountGateOptions {
    *  reason to set one is to keep people out. A signed-in account not on it meets a 403 that
    *  names the account it is signed in as and offers Sign out. */
   allow?: readonly string[] | (() => readonly string[] | undefined);
+  /** `read` (default): sign in to read anything. `act`: everything is readable with no door;
+   *  sign in only to mint a share or superlink. */
+  mode?: GateMode;
 }
+
+export type GateMode = 'read' | 'act';
+export const GATE_MODES: readonly GateMode[] = ['read', 'act'];
 
 /** Parse a comma- or whitespace-separated list of account ids, e.g. an env var. */
 export function parseAllowList(raw: string | undefined | null): string[] {
@@ -435,6 +449,10 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
   const signInUrl = opts.signInUrl ?? DEFAULT_SIGN_IN;
   const grantDays = opts.grantDays ?? DEFAULT_GRANT_DAYS;
   const openPaths = opts.openPaths ?? DEFAULT_OPEN_PATHS;
+  const act = opts.mode === 'act';
+  if (opts.mode !== undefined && !GATE_MODES.includes(opts.mode)) {
+    throw new Error(`createFreedomAccountGate: mode "${String(opts.mode)}" is not one of ${GATE_MODES.join(', ')}`);
+  }
 
   const gate: GateFn = async function accountGate(request: Request): Promise<GateVerdict> {
     const secret = opts.secret ?? process.env.WIKI_PASS_SECRET ?? process.env.WIKI_GATE_SECRET ?? '';
@@ -483,10 +501,15 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
       if (opts.allow === undefined) return { authorized: true, reader };
       const allowed = typeof opts.allow === 'function' ? opts.allow() ?? [] : opts.allow;
       if (allowed.includes(reader)) return { authorized: true, reader };
+      // Act mode: the page is public, so they read it like anyone; they just cannot act.
+      if (act) return { authorized: true, reader, cannotAct: { refused: 'not_allowed' } };
       // NOT authorized, so the share layer still serves a share link to this reader as it
       // would to anyone, and the read beacon drops their pings.
       return { authorized: false, response: htmlResponse(notAllowedPage(opts.title ?? url.host, reader, opts.door?.theme), 403) };
     }
+
+    // Act mode: no door. Anyone reads; the share layer sends them to sign in when they act.
+    if (act) return { authorized: true, cannotAct: { signInUrl } };
 
     // The door, carrying the page they asked for with any spent credential stripped off.
     const back = cleanUrl(PASS_PARAM);

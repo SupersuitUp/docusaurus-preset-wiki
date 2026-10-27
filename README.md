@@ -155,6 +155,19 @@ wiki gate status                          # on an account wiki: no password need
 wiki gate link /some/page                 # the hourly ?k= link an operator gets
 ```
 
+**Act mode: public to read, sign in to share.** `"gate": { "type": "freedom-account", "mode": "act" }`
+serves every page to anyone with no door, and asks for a Supersuit sign-in only when a reader ACTS,
+which today means minting a share link or superlink from the copy-link button (the
+[superlink standard](https://hypercontext.wiki/standards/superlink/v1): reading never needs sign-in,
+acting does). A mint with no grant goes to `signInUrl` and returns to the page with `?act=share`,
+where the button finishes the share and shows the link; a superlink minted then records the
+signed-in reader as its maker. `allowEnv` and `shareAdminsEnv` still limit who may mint, never who
+may read. The default `mode` is `read`, the door over every page.
+
+```json
+"gate": { "type": "freedom-account", "mode": "act" }
+```
+
 `pnpm share` on an account wiki unlocks with `WIKI_KEY` (the hourly key; the Freedom plugin's
 `wikiKey()` fetches it with the operator's own login) and mints the focused one-page link as usual.
 

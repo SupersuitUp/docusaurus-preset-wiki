@@ -153,6 +153,8 @@ export function createMiddleware(opts: MiddlewareOptions = {}) {
       reader: verdict.reader,
       shareAdmins: typeof opts.shareAdmins === 'function' ? opts.shareAdmins() ?? [] : opts.shareAdmins,
       shut: opts.shut,
+      cannotAct: verdict.authorized ? verdict.cannotAct : undefined,
+      accept: request.headers.get('accept'),
     });
     if (share) {
       // A named superlink was minted: the one moment who it is for is written down, to the
@@ -224,9 +226,9 @@ export default createMiddleware();
 
 export { createPasswordGate, hasValidTicket } from './gate/passwordGate';
 export type { PasswordGateOptions } from './gate/passwordGate';
-export { createFreedomAccountGate, hasValidGrant, grantReader, hourKey, mintPass, grantCookieValue, parseAllowList, notAllowedPage, GRANT_COOKIE, DEFAULT_OPEN_PATHS } from './gate/accountGate';
+export { createFreedomAccountGate, GATE_MODES, hasValidGrant, grantReader, hourKey, mintPass, grantCookieValue, parseAllowList, notAllowedPage, GRANT_COOKIE, DEFAULT_OPEN_PATHS } from './gate/accountGate';
 export { handleSignOut, isSignOut, justSignedOut, SIGN_OUT_PATH, GATE_COOKIES } from './gate/signOut';
-export type { AccountGateOptions } from './gate/accountGate';
+export type { AccountGateOptions, GateMode } from './gate/accountGate';
 export { gateFromConfig, unlockParamFor } from './gate/fromConfig';
 export type { WikiGateConfig, WikiGateType } from './gate/fromConfig';
 

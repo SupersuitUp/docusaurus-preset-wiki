@@ -12,6 +12,11 @@ export interface GateVerdict {
    *  `password`, since a shared word names nobody. Absent means unknown, and the event says
    *  `anonymous`. Never read from anything the browser can write. */
   reader?: string;
+  /** Set by a gate in ACT mode (accountGate `mode: 'act'`) on an authorized verdict whose reader may
+   *  READ but may not ACT (mint a share or superlink). `signInUrl`: no grant, so the share layer
+   *  sends them to sign in and back. `refused`: signed in, but not an account this wiki lets act.
+   *  Absent: whoever is authorized may act, as every gate before act mode. */
+  cannotAct?: { signInUrl: string } | { refused: 'not_allowed' };
 }
 
 /** A gate is a function; `readSink` is the analytics endpoint it implies with no config, if any

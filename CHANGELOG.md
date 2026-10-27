@@ -5,6 +5,34 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## Unreleased
+
+**Act mode: a Freedom-account wiki can be public to READ and ask for sign-in only to ACT.** The
+account gate had one shape, a door over every page, so a wiki that should be readable by anyone
+(the AI wikis Continental Works owns) could either lock out every reader or drop the gate and lose
+the signed-in maker on every share. Gary approved act mode on 2026-10-27, following the superlink
+standard (https://hypercontext.wiki/standards/superlink/v1: reading never needs sign-in; acting does).
+
+- `createFreedomAccountGate({ mode: 'act' })`, or `"gate": { "type": "freedom-account", "mode": "act" }`
+  in `wiki.config.json`. The default stays `read`, unchanged.
+- In act mode every page is served with no door. A pass or key is still redeemed, a grant still
+  names its reader, and the verdict marks a reader who may read but not act (`cannotAct`).
+- `/s/mint` (one-page shares and superlinks) with no grant goes to the same sign-in URL, returning to
+  the page with `?act=share`: a navigation gets a 303, the Share button's fetch gets
+  `401 {error: "sign_in_to_act", signIn}` and sends the reader there. Back on the page, the button
+  finishes the mint and shows the link. A signed-in reader off `allowEnv` reads but gets 403 on mint.
+- A superlink minted in act mode reports the signed-in reader as its maker in the `mint` event.
+- A share address opened by someone with no grant serves the one-article view, so the read counts
+  against the link.
+- `gate.mode` is in `wiki.config.schema.json`; an unknown mode, or a mode on a non-account gate, is
+  an error at build.
+- DETECTOR: `"mode": "act"` in a wiki's gate block is flagged by the editor, or a page on that wiki
+  still answers 401 with the door.
+- REMEDY: bump the package, set `"gate": { "type": "freedom-account", "mode": "act" }`.
+- Tests: src/gate/accountGate.test.ts (act mode a, b, c, allowlist, share address; read mode d),
+  src/gate/fromConfig.test.ts (the config key and its refusals), src/config-schema.test.ts (every
+  gate key is in the schema), src/share/mintAndCopy.test.ts (the sign-in hand-back, `actReturn`).
+
 ## 1.21.1 (2026-10-26)
 
 **`superlinks` is a key the config schema knows, and a wiki with its own middleware can use superlinks.**

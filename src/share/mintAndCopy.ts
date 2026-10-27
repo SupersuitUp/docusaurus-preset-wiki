@@ -104,7 +104,7 @@ export async function mintAndCopy(deps: MintDeps): Promise<MintResult> {
 export async function linkForPage(
   href: string,
   fetchImpl: (input: string, init?: RequestInit) => Promise<Response> = fetch,
-): Promise<{ url: string; focused: boolean; adminOnly?: true }> {
+): Promise<{ url: string; focused: boolean; adminOnly?: true; signIn?: string }> {
   const page = new URL(href);
   const fallback = { url: page.origin + page.pathname, focused: false };
   try {
@@ -118,6 +118,14 @@ export async function linkForPage(
       const refusal = (await res.json().catch(() => ({}))) as { error?: unknown };
       if (refusal.error === 'not_share_admin') return { ...fallback, adminOnly: true };
     }
+    if (res.status === 401) {
+      // An act-mode wiki: public to read, sign in to share. The edge names where to go; the
+      // button sends the reader there and the page they return to finishes the share.
+      const ask = (await res.json().catch(() => ({}))) as { error?: unknown; signIn?: unknown };
+      if (ask.error === 'sign_in_to_act' && typeof ask.signIn === 'string' && /^https:\/\//.test(ask.signIn)) {
+        return { ...fallback, signIn: ask.signIn };
+      }
+    }
     if (!res.ok) return fallback;
     const body = (await res.json()) as { url?: unknown; focused?: unknown };
     if (typeof body.url !== 'string' || !/^https?:\/\//.test(body.url)) return fallback;
@@ -125,4 +133,14 @@ export async function linkForPage(
   } catch {
     return fallback;
   }
+}
+
+/** A page reached back from an act-mode sign-in carries `?act=share` (src/share/handleShare.ts):
+ *  `finish` says the Share button should complete the share it started, and `clean` is the address
+ *  to put back in the bar with the marker off. */
+export function actReturn(href: string): { finish: boolean; clean: string } {
+  const u = new URL(href);
+  const finish = u.searchParams.get('act') === 'share';
+  if (finish) u.searchParams.delete('act');
+  return { finish, clean: u.pathname + u.search + u.hash };
 }

@@ -20,6 +20,8 @@ export interface WikiConfig {
     openPaths?: string;
     grantDays?: number;
     title?: string;
+    /** freedom-account only: `act` leaves every page readable and asks for sign-in only to share. */
+    mode?: 'read' | 'act';
   };
   /** Reader analytics (src/analytics/reads.ts). false turns it off; an object names the sink. */
   analytics?: boolean | { endpoint?: string };

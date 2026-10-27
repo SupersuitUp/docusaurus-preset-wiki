@@ -14,6 +14,7 @@
 //     "openPaths": "regex source",  account gate: REPLACES the default machine-path pattern
 //     "grantDays": 7,               account gate: how long a sign-in lasts
 //     "shareAdminsEnv": "WIKI_SHARE_ADMINS"  account gate: only these accounts mint share links
+//     "mode": "read" | "act",       account gate: "act" = public to read, sign in only to share
 //     "title": "…"                  what the door calls the wiki; defaults to the host
 //   }
 //
@@ -30,7 +31,7 @@
 
 import type { GateFn } from './types';
 import { createPasswordGate } from './passwordGate';
-import { createFreedomAccountGate, parseAllowList, DOOR_THEMES, type DoorTheme } from './accountGate';
+import { createFreedomAccountGate, parseAllowList, DOOR_THEMES, GATE_MODES, type DoorTheme, type GateMode } from './accountGate';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -51,6 +52,9 @@ export interface WikiGateConfig {
   shareAdminsEnv?: string;
   /** freedom-account only: the door's own heading and line, for a wiki that is not early access. */
   door?: { heading?: string; body?: string; theme?: DoorTheme };
+  /** freedom-account only: `read` (default) gates every page; `act` leaves every page readable
+   *  and asks for sign-in only to mint a share or superlink. */
+  mode?: GateMode;
 }
 
 const TYPES: WikiGateType[] = ['password', 'freedom-account', 'none'];
@@ -68,6 +72,9 @@ export function gateFromConfig(gate: WikiGateConfig | undefined): GateFn | undef
   if (!TYPES.includes(type)) {
     throw new Error(`wiki.config.json gate.type "${String(type)}" is not one of ${TYPES.join(', ')}`);
   }
+  if (gate?.mode !== undefined && type !== 'freedom-account') {
+    throw new Error(`wiki.config.json gate.mode applies only to type freedom-account, not "${type}"`);
+  }
   if (type === 'none') return undefined;
   if (type === 'password') {
     return createPasswordGate({
@@ -75,6 +82,9 @@ export function gateFromConfig(gate: WikiGateConfig | undefined): GateFn | undef
       machinePaths: gate?.machinePaths,
       title: gate?.title,
     });
+  }
+  if (gate?.mode !== undefined && !GATE_MODES.includes(gate.mode)) {
+    throw new Error(`wiki.config.json gate.mode "${String(gate.mode)}" is not one of ${GATE_MODES.join(', ')}`);
   }
   if (gate?.door?.theme !== undefined && !DOOR_THEMES.includes(gate.door.theme)) {
     throw new Error(`wiki.config.json gate.door.theme "${String(gate.door.theme)}" is not one of ${DOOR_THEMES.join(', ')}`);
@@ -92,6 +102,7 @@ export function gateFromConfig(gate: WikiGateConfig | undefined): GateFn | undef
     // The ids live in the deployment's env, never in the committed config: read per request.
     allow: gate?.allowEnv ? () => parseAllowList(process.env[gate.allowEnv as string]) : undefined,
     door: gate?.door,
+    mode: gate?.mode,
   });
 }
 

@@ -56,3 +56,10 @@ test('a route that is not shareable mints nothing', async () => {
   assert.equal(await mintSuperlink(S, '/s/abc', { forward: 'off' }), null);
   assert.equal(await mintSuperlink('', '/a', { forward: 'off' }), null);
 });
+
+test('a wiki not yet on the package can reach superlinks and the read sender from ./middleware', async () => {
+  const mw = await import('../middleware');
+  for (const name of ['mintSuperlink', 'verifySuperlink', 'parseSuperlink', 'buildEvent', 'sendEvent', 'resolveSink']) {
+    assert.equal(typeof (mw as Record<string, unknown>)[name], 'function', name);
+  }
+});

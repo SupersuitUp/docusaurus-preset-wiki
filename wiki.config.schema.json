@@ -178,6 +178,14 @@
         }
       ]
     },
+    "superlinks": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Superlinks (1.21.0): one article sent to one person. `shut` lists link ids that no longer open; a shut id shuts every link forwarded from it.",
+      "properties": {
+        "shut": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9]{12}$" }, "uniqueItems": true }
+      }
+    },
     "hero_register": {
       "type": "object",
       "additionalProperties": false,

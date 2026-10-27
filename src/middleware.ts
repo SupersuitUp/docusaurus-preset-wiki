@@ -76,8 +76,11 @@ export interface MiddlewareOptions {
 }
 
 export {
-  READ_PATH, READ_SIG_HEADER, READ_SIG_LABEL, signReadBody, resolveSink, buildEvent, sameSiteRoute,
+  READ_PATH, READ_SIG_HEADER, READ_SIG_LABEL, signReadBody, resolveSink, buildEvent, sendEvent, sameSiteRoute,
 } from './analytics/reads';
+// Superlinks (1.21.0), for a wiki with its own middleware that is not yet on createMiddleware.
+export { mintSuperlink, verifySuperlink, parseSuperlink } from './share/superlink';
+export type { ForwardMode, SuperlinkVerdict } from './share/superlink';
 export type { ReadEvent, ReadSink, AnalyticsOption, MiddlewareContext } from './analytics/reads';
 
 export function createMiddleware(opts: MiddlewareOptions = {}) {

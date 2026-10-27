@@ -5,6 +5,21 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## 1.21.1 (2026-10-26)
+
+**`superlinks` is a key the config schema knows, and a wiki with its own middleware can use superlinks.**
+1.21.0 documented `superlinks.shut` in `wiki.config.json` while `wiki.config.schema.json`
+(`additionalProperties: false`) refused it, so an editor flagged a correct config. And a wiki not yet
+on `createMiddleware` (one with its own gate) had no way to reach the superlink functions.
+
+- `wiki.config.schema.json` gains `superlinks: { shut: [12-character ids] }`.
+- `./middleware` exports `mintSuperlink`, `verifySuperlink`, `parseSuperlink` and `sendEvent`.
+- DETECTOR: an editor flags `superlinks` in `wiki.config.json`; or `import { verifySuperlink } from
+  '@supersuit/docusaurus-preset-wiki/middleware'` is undefined.
+- REMEDY: bump the package.
+- Tests: src/config-schema.test.ts (every WikiConfig key is a schema property, which would have caught
+  1.21.0), src/share/superlink.test.ts (the exports).
+
 ## 1.21.0 (2026-10-26)
 
 **Superlinks: a wiki article sent to one person as a link that knows which link it is.** The

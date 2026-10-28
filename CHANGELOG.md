@@ -17,6 +17,15 @@ this, switch that import to the subpath. Tests: `src/theme/ShareButton/share-but
 resolves the subpath under the import and require conditions, loads the component, and checks
 the declared types file is emitted.
 
+**Test files no longer ship in the package (#8).** `tsc` compiled every `src/**/*.test.mjs` into
+`lib/` (the tsconfig excluded only `.test.ts`/`.test.tsx`, and `allowJs` is on), and `files:
+["src"]` shipped every source test as well: 63 test files in the 1.23.0 tarball, none of them
+imported by any export. DETECTOR: `npm pack --dry-run --json | grep '\.test\.'`. REMEDY: none for
+consumers; the tsconfig excludes `*.test.mjs`/`*.test.js`, `copy-assets` skips any `.test.`
+file, `files` negates `lib/**/*.test.*` and `src/**/*.test.*`, and `build` now empties `lib/`
+first so a stale compiled file cannot ride along. Tests: `test/package-contents.test.mjs`
+(`npm run test:packed`) packs the package and refuses any `.test.` path or exports target.
+
 ## 1.23.0 (2026-10-28)
 
 **The bulk exports of a gated wiki are behind the account (supersuit-wiki#15, approved by Gary

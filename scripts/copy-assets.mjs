@@ -17,7 +17,7 @@ function walk(dir) {
 
 let n = 0;
 for (const file of walk(SRC)) {
-  if (!KEEP.test(file) || /\.test\.mjs$/.test(file)) continue;
+  if (!KEEP.test(file) || /\.test\./.test(file)) continue;
   const dest = join(OUT, relative(SRC, file));
   mkdirSync(dirname(dest), { recursive: true });
   cpSync(file, dest);

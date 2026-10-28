@@ -45,12 +45,15 @@
     "src",
     "wiki.config.schema.json",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "!lib/**/*.test.*",
+    "!src/**/*.test.*"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "build": "node scripts/clean-lib.mjs && tsc -p tsconfig.json && node scripts/copy-assets.mjs",
     "test": "node --import tsx --test 'src/**/*.test.ts' 'src/**/*.test.mjs' && node src/cli/test-image-provenance.mjs",
     "test:fixture": "node --test test/build-fixture.test.mjs",
+    "test:packed": "node --test test/package-contents.test.mjs",
     "prepack": "npm run build"
   },
   "peerDependencies": {

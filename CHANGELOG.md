@@ -5,7 +5,7 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
-## Unreleased
+## 1.25.0 (2026-10-28)
 
 **A forward of a forward of a shut superlink no longer opens (#9).** Rule 7 of the superlink
 standard (https://hypercontext.wiki/standards/superlink/v1) is that a forward never outlives its

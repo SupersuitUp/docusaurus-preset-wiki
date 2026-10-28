@@ -5,7 +5,7 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
-## Unreleased
+## 1.23.0 (2026-10-28)
 
 **The bulk exports of a gated wiki are behind the account (supersuit-wiki#15, approved by Gary
 2026-10-28).** `llms.txt`, `llms-full.txt` and `search-index.json` are the text of every page in one

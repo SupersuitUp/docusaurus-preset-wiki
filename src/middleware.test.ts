@@ -81,6 +81,14 @@ test('matcher exempts skills, generators and webmanifest', () => {
   assert.equal(re.test('/s/mint'), true);
 });
 
+test('the family matcher sends search-index.json to the gate and still skips every other .json (preset#7)', () => {
+  const re = new RegExp('^' + MATCHER[0] + '$');
+  for (const p of ['/search-index.json', '/llms.txt', '/llms-full.txt', '/concepts/x'])
+    assert.equal(re.test(p), true, `${p} reaches the gate`);
+  for (const p of ['/manifest.json', '/old-routes.json', '/img/a.webp.recipe.json', '/x/search-index.json', '/search-index.json.map', '/skills/x/SKILL.md', '/assets/js/a.js'])
+    assert.equal(re.test(p), false, `${p} is skipped`);
+});
+
 test('the skills-are-pages matcher sends the bulk exports to the gate and still skips agent files (supersuit-wiki#15)', () => {
   const re = new RegExp('^' + matcherFor('skills-are-pages')[0] + '$');
   for (const p of ['/llms.txt', '/llms-full.txt', '/search-index.json', '/skills/x', '/concepts/x'])

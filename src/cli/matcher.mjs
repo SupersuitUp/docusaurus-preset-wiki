@@ -8,7 +8,10 @@
 // the gate and instead skips only the files an agent fetches (.md, .json). The bulk exports
 // (llms.txt, llms-full.txt, search-index.json) reach the gate, which keys them: until
 // 2026-10-28 this variant skipped them too, and the gated Supersuit Wiki's whole text was one
-// curl away (supersuit-wiki#15).
+// curl away (supersuit-wiki#15). The family matcher skipped every .json until the same day, so
+// a gated wiki on it served search-index.json open (docusaurus-preset-wiki#7); it now carves
+// search-index.json out of the .json skip the same way. Retired literals stay in matcher.json
+// under `retired`, so `wiki check middleware` can say why an instance's copy is stale.
 //
 // A named variant rather than a free-form literal, so `wiki check middleware` still refuses
 // drift: an instance may pick among the package's literals, never write its own.
@@ -32,6 +35,11 @@ export function matcherFor(name) {
 /** The first matcher entry as it is written in TS source: each backslash doubled. */
 export function matcherSource(name) {
   return matcherFor(name)[0].replace(/\\/g, '\\\\');
+}
+
+/** Literals the package used to ship, in TS source form, each with why it was retired. */
+export function retiredMatchers() {
+  return (MATCHERS.retired ?? []).map((r) => ({ source: r.matcher.replace(/\\/g, '\\\\'), why: r.why }));
 }
 
 /** The variant name a wiki root declares (`matcher` in wiki.config.json), or undefined. */

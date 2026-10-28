@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMiddleware, MATCHER } from './middleware';
+import { matcherFor } from './cli/matcher.mjs';
 
 const req = (url: string, ua = 'Mozilla/5.0', extra: Record<string, string> = {}) =>
   new Request(url, { headers: { 'user-agent': ua, ...extra } });
@@ -78,4 +79,12 @@ test('matcher exempts skills, generators and webmanifest', () => {
   assert.equal(re.test('/img/og/x.png'), false);
   assert.equal(re.test('/concepts/x'), true);
   assert.equal(re.test('/s/mint'), true);
+});
+
+test('the skills-are-pages matcher sends the bulk exports to the gate and still skips agent files (supersuit-wiki#15)', () => {
+  const re = new RegExp('^' + matcherFor('skills-are-pages')[0] + '$');
+  for (const p of ['/llms.txt', '/llms-full.txt', '/search-index.json', '/skills/x', '/concepts/x'])
+    assert.equal(re.test(p), true, `${p} reaches the gate`);
+  for (const p of ['/skills/x/SKILL.md', '/img/a.webp.recipe.json', '/manifest.json', '/old-routes.json', '/assets/js/a.js'])
+    assert.equal(re.test(p), false, `${p} is skipped`);
 });

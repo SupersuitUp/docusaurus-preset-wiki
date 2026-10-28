@@ -5,7 +5,7 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
-## Unreleased
+## 1.24.0 (2026-10-28)
 
 **The Share button is a public export, `@supersuit/docusaurus-preset-wiki/share-button`.** Four
 theme-classic wikis (hyperagency, appliedai, agenticbusiness, truth-management) render it from

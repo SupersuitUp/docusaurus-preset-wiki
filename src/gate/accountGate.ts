@@ -33,8 +33,16 @@
 // on each wiki means a second copy of every one of those, and a second place a revocation has
 // to reach. One sign-in, one check, N wikis.
 //
-// MACHINE PATHS STAY OPEN by default (hosted skills, generators, llms.txt, audio, video, pdf):
-// an agent fetching a SKILL.md cannot answer a door. `openPaths` REPLACES that default for a
+// MACHINE PATHS STAY OPEN by default (hosted skills, generators, audio, video, pdf): an agent
+// fetching a SKILL.md cannot answer a door.
+//
+// THE BULK EXPORTS ARE NOT MACHINE PATHS (supersuit-wiki#15, 2026-10-28). llms.txt, llms-full.txt
+// and search-index.json are the text of every gated page in one file, and serving them open made
+// the whole Supersuit Wiki readable with one curl while every page answered 401. They are KEYED:
+// checked before `openPaths` (so no wiki's openPaths can reopen them), and opened in ONE request,
+// never a 303 a program cannot follow, by the hourly key as `?k=` or `Authorization: Bearer <key>`,
+// by a pass, or by the grant a signed-in browser already holds (the search box). Anything else is
+// a plain-text 401. Act mode leaves them open, since its pages are open too. `openPaths` REPLACES that default for a
 // wiki where the default is wrong, such as one whose `/skills/` prefix is a docs reference and
 // only the `.md` files under it are for agents.
 //
@@ -65,6 +73,9 @@ export interface AccountGateOptions {
   grantDays?: number;
   /** Replaces the default machine-path pattern: paths matching it are served with no grant. */
   openPaths?: RegExp;
+  /** Replaces the default bulk-export pattern: paths served only to a key, pass or grant, in one
+   *  request, checked before `openPaths`. Ignored in act mode. */
+  keyedPaths?: RegExp;
   /** Shown on the door. Defaults to the request host. */
   title?: string;
   /** The door's own words. The default speaks to an early-access wiki; a wiki with a different
@@ -100,8 +111,10 @@ const VERSION = 'v1';
 const HOUR_MS = 3_600_000;
 const DEFAULT_GRANT_DAYS = 7;
 const DEFAULT_SIGN_IN = 'https://freedom.continentalworks.ai/wiki/sign-in';
-/** Hosted skills and generators, llms.txt, and the media a player fetches. */
-export const DEFAULT_OPEN_PATHS = /^\/(llms\.txt|llms-full\.txt|skills\/|generators\/)|\.(?:md|txt|mp3|mp4|m4a|wav|pdf)$/i;
+/** Hosted skills and generators, and the media a player fetches. */
+export const DEFAULT_OPEN_PATHS = /^\/(skills\/|generators\/)|\.(?:md|txt|mp3|mp4|m4a|wav|pdf)$/i;
+/** The bulk exports: every page's text in one file. Keyed, never open, on a read-mode wiki. */
+export const DEFAULT_KEYED_PATHS = /^\/(llms\.txt|llms-full\.txt|search-index\.json)$/i;
 // A uid is a Firebase uid (28 url-safe characters) or the word `key` for a grant the hourly
 // key bought. Nothing else may appear between the dots.
 const UID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -441,6 +454,27 @@ function redirect(location: string, setCookie: string): Response {
   return new Response(null, { status: 303, headers: { location, 'set-cookie': setCookie, 'cache-control': 'no-store' } });
 }
 
+// A program asked for an export without a credential. Plain text, because nothing that fetches
+// llms-full.txt can press the door's button, and it says what to send.
+function keyRequired(status: 401 | 403): Response {
+  const body = status === 401
+    ? 'This file holds the text of every page on this wiki, which is behind a Supersuit account.\n' +
+      'Send the hourly wiki key as `Authorization: Bearer <key>` or `?k=<key>`; a signed-in Supersuit install gets it from the portal\'s /api/wiki-key.\n'
+    : 'This wiki admits a named list of accounts, and the credential sent is not on it.\n';
+  return new Response(body, {
+    status,
+    headers: {
+      'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex',
+      'www-authenticate': 'Bearer realm="wiki", error="invalid_token"',
+    },
+  });
+}
+
+function bearer(request: Request): string | null {
+  const m = /^Bearer\s+(\S+)$/i.exec(request.headers.get('authorization') ?? '');
+  return m ? m[1] : null;
+}
+
 function passThroughWithWarning(reason: string): Response {
   return new Response(null, { headers: { 'x-middleware-next': '1', 'x-wiki-gate': reason } });
 }
@@ -449,6 +483,7 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
   const signInUrl = opts.signInUrl ?? DEFAULT_SIGN_IN;
   const grantDays = opts.grantDays ?? DEFAULT_GRANT_DAYS;
   const openPaths = opts.openPaths ?? DEFAULT_OPEN_PATHS;
+  const keyedPaths = opts.keyedPaths ?? DEFAULT_KEYED_PATHS;
   const act = opts.mode === 'act';
   if (opts.mode !== undefined && !GATE_MODES.includes(opts.mode)) {
     throw new Error(`createFreedomAccountGate: mode "${String(opts.mode)}" is not one of ${GATE_MODES.join(', ')}`);
@@ -474,6 +509,23 @@ export function createFreedomAccountGate(opts: AccountGateOptions = {}): GateFn 
       const clean = cleanUrl(drop);
       return { authorized: false, response: redirect(clean.pathname + (clean.search || '') + clean.hash, await grantCookie(uid)) };
     };
+
+    // A BULK EXPORT IS KEYED, AND THAT IS DECIDED FIRST, before openPaths can call it a machine
+    // path. One request: the credential is checked and the file served, or a plain 401.
+    if (!act && keyedPaths.test(url.pathname)) {
+      let holder: string | null = null;
+      const k = url.searchParams.get(KEY_PARAM) ?? bearer(request);
+      if (k !== null) holder = await keyHolder(k, keySecret, now);
+      const pass = url.searchParams.get(PASS_PARAM);
+      if (holder === null && pass !== null) holder = (await verifyToken(pass, secret, 'wiki-pass', nowSeconds))?.uid ?? null;
+      if (holder === null) holder = await grantReader(request, secret, now);
+      if (holder === null) return { authorized: false, response: keyRequired(401) };
+      if (opts.allow !== undefined) {
+        const allowed = typeof opts.allow === 'function' ? opts.allow() ?? [] : opts.allow;
+        if (!allowed.includes(holder)) return { authorized: false, response: keyRequired(403) };
+      }
+      return { authorized: true, reader: holder };
+    }
 
     // AN OPEN PATH IS SERVED FIRST, credential or not. A machine path is fetched by a program
     // with no cookie jar, so a 303 that sets a grant is an instruction it cannot follow, and a

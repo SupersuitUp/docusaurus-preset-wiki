@@ -126,7 +126,7 @@
         },
         "openPaths": {
           "type": "string",
-          "description": "freedom-account only. A regular expression (source text, case-insensitive) of paths served with no sign-in. REPLACES the default (hosted skills and generators, llms.txt, .md/.txt/media/.pdf); use it on a wiki whose /skills/ prefix is a docs reference and only the .md files under it are for agents."
+          "description": "freedom-account only. A regular expression (source text, case-insensitive) of paths served with no sign-in. REPLACES the default (hosted skills and generators, .md/.txt/media/.pdf); use it on a wiki whose /skills/ prefix is a docs reference and only the .md files under it are for agents. It cannot open the bulk exports (llms.txt, llms-full.txt, search-index.json): in read mode those are always keyed, served only to the hourly key (`?k=` or `Authorization: Bearer`), a pass or a grant."
         },
         "allowEnv": {
           "type": "string",
@@ -402,7 +402,7 @@
         "default",
         "skills-are-pages"
       ],
-      "description": "Which middleware matcher literal middleware.ts must carry (`wiki check middleware` refuses any other). `default` (or absent) is the family matcher, which skips /skills/ and /generators/ wholesale because they hold agent files. `skills-are-pages` is for a gated wiki whose /skills/* routes are DOCS PAGES: it lets them reach the gate and skips only .md, llms.txt and llms-full.txt."
+      "description": "Which middleware matcher literal middleware.ts must carry (`wiki check middleware` refuses any other). `default` (or absent) is the family matcher, which skips /skills/ and /generators/ wholesale because they hold agent files. `skills-are-pages` is for a gated wiki whose /skills/* routes are DOCS PAGES: it lets them reach the gate and skips only .md and .json files, except search-index.json; the bulk exports (llms.txt, llms-full.txt, search-index.json) reach the gate, which keys them."
     },
     "llms_preamble": {
       "type": "string",

@@ -5,6 +5,26 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## Unreleased
+
+**The bulk exports of a gated wiki are behind the account (supersuit-wiki#15, approved by Gary
+2026-10-28).** `llms.txt`, `llms-full.txt` and `search-index.json` are the text of every page in one
+file, and they were served open: on the Supersuit Wiki every page answered 401 while
+`/llms-full.txt` (3 MB) and `/search-index.json` answered 200 to anyone, and every other
+account-gated wiki served its `search-index.json` the same way.
+
+- The account gate KEYS them (`DEFAULT_KEYED_PATHS`, overridable as `keyedPaths`), decided before
+  `openPaths`, so no wiki's openPaths can reopen them. One request, never a 303: the hourly key as
+  `?k=` or `Authorization: Bearer <key>`, a pass, or the grant a signed-in browser holds (the
+  search box keeps working). Anything else is a plain-text 401 with `WWW-Authenticate: Bearer`; an
+  allowlist answers 403 to a holder not on it. Act mode leaves them open, as its pages are.
+- `llms.txt` and `llms-full.txt` left `DEFAULT_OPEN_PATHS`.
+- The `skills-are-pages` matcher no longer skips `llms.txt`, `llms-full.txt` or
+  `search-index.json`, so the gate sees them. **A wiki on that variant must copy the new literal
+  into its middleware.ts** when it takes this release; `wiki check middleware` names it.
+- Not yet covered: the family (`default`) matcher still skips every `.json`, so a gated wiki on it
+  keeps serving `search-index.json` until that literal changes too, which every instance must copy.
+
 ## 1.22.0 (2026-10-27)
 
 **Act mode: a Freedom-account wiki can be public to READ and ask for sign-in only to ACT.** The

@@ -5,7 +5,10 @@
 // /skills/* routes are gated DOCS PAGES (getfreedom, where the skill reference sits behind the
 // account), that exclusion publishes the reference: the middleware never runs, so the gate never
 // sees the request. Such a wiki names the `skills-are-pages` variant, which lets /skills/ reach
-// the gate and instead skips only the files an agent fetches (.md, llms.txt, llms-full.txt).
+// the gate and instead skips only the files an agent fetches (.md, .json). The bulk exports
+// (llms.txt, llms-full.txt, search-index.json) reach the gate, which keys them: until
+// 2026-10-28 this variant skipped them too, and the gated Supersuit Wiki's whole text was one
+// curl away (supersuit-wiki#15).
 //
 // A named variant rather than a free-form literal, so `wiki check middleware` still refuses
 // drift: an instance may pick among the package's literals, never write its own.

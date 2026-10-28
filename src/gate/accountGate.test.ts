@@ -142,7 +142,7 @@ test('the key secret defaults to the pass secret when none is given', async () =
 
 test('machine paths and unfurl bots pass; training crawlers never reach the door', async () => {
   const mw = gated();
-  for (const p of ['/skills/x/SKILL.md', '/llms.txt', '/llms-full.txt', '/audio/a.mp3', '/generators/g/GENERATE.md'])
+  for (const p of ['/skills/x/SKILL.md', '/audio/a.mp3', '/generators/g/GENERATE.md'])
     assert.equal(await mw(req(`https://t.wiki${p}`)), undefined, p);
   assert.equal(await mw(req('https://t.wiki/concepts/x', { ua: 'Slackbot-LinkExpanding 1.0' })), undefined, 'unfurl bot');
   assert.equal((await mw(req('https://t.wiki/concepts/x', { ua: 'GPTBot/1.0' })))?.status, 403);
@@ -151,6 +151,52 @@ test('machine paths and unfurl bots pass; training crawlers never reach the door
 test('a key on a machine path serves the file in one request, no 303, no cookie (freedom#137)', async () => {
   const res = await gated()(req(`https://t.wiki/skills/x/SKILL.md?k=${await hourKey(SECRET, Date.now())}`));
   assert.equal(res, undefined);
+});
+
+// THE BULK EXPORTS (supersuit-wiki#15). llms.txt, llms-full.txt and search-index.json carry the
+// text of every gated page in one file, so serving them open published the whole wiki to anyone
+// with curl. They are behind the same credentials the pages take, answered in one request.
+const EXPORTS = ['/llms.txt', '/llms-full.txt', '/search-index.json'];
+const keyReq = (url: string, headers: Record<string, string>) => new Request(url, { headers: { 'user-agent': 'node', ...headers } });
+
+test('the bulk exports refuse a stranger with a plain 401, even where openPaths names them', async () => {
+  // The second gate is the Supersuit Wiki's own openPaths, which names llms and every .json.
+  for (const mw of [gated(), gated({ openPaths: /^\/(llms\.txt|llms-full\.txt)$|\.(?:md|txt|json)$/i })]) {
+    for (const p of EXPORTS) {
+      const res = await mw(req(`https://t.wiki${p}`));
+      assert.equal(res?.status, 401, p);
+      assert.match(res!.headers.get('content-type') ?? '', /text\/plain/, `${p}: a program gets text, not the door`);
+      assert.match(res!.headers.get('www-authenticate') ?? '', /^Bearer/, p);
+      assert.equal(res!.headers.get('location'), null, `${p}: never a redirect`);
+    }
+  }
+});
+
+test('the hourly key opens an export in one request, as ?k= or a Bearer header, with no 303', async () => {
+  const mw = gated();
+  const bare = await hourKey(SECRET, Date.now());
+  const named = await namedHourKey(SECRET, Date.now(), 'uid1');
+  assert.equal(await mw(req(`https://t.wiki/llms-full.txt?k=${bare}`)), undefined, 'bare key in the query');
+  assert.equal(await mw(keyReq('https://t.wiki/llms-full.txt', { authorization: `Bearer ${named}` })), undefined, 'named key as a header');
+  assert.equal(await mw(keyReq('https://t.wiki/llms.txt', { authorization: `Bearer ${bare}` })), undefined, 'bare key as a header');
+  assert.equal((await mw(keyReq('https://t.wiki/llms-full.txt', { authorization: `Bearer ${'0'.repeat(32)}` })))?.status, 401, 'a wrong key');
+  assert.equal((await mw(req(`https://t.wiki/llms-full.txt?k=${await hourKey('other', Date.now())}`)))?.status, 401, 'a foreign key');
+});
+
+test('a signed-in reader reads the exports with the grant they already hold (the search box)', async () => {
+  const mw = gated();
+  const cookie = `fw_gate=${await grantCookieValue(SECRET, 'abc', Math.floor(Date.now() / 1000) + 3600)}`;
+  assert.equal(await mw(req('https://t.wiki/search-index.json', { cookie })), undefined);
+  const pass = await mintPass(SECRET, 'abc', Math.floor(Date.now() / 1000) + 300);
+  assert.equal(await mw(req(`https://t.wiki/llms-full.txt?pass=${pass}`)), undefined, 'a pass opens it without a 303');
+});
+
+test('an allowlist binds the exports too, and act mode leaves them open with its pages', async () => {
+  const bare = await hourKey(SECRET, Date.now());
+  assert.equal((await gated({ allow: ['gary'] })(req(`https://t.wiki/llms-full.txt?k=${bare}`)))?.status, 403, 'a bare key names nobody on the list');
+  const named = await namedHourKey(SECRET, Date.now(), 'gary');
+  assert.equal(await gated({ allow: ['gary'] })(req(`https://t.wiki/llms-full.txt?k=${named}`)), undefined, 'a listed account');
+  for (const p of EXPORTS) assert.equal(await gated({ mode: 'act' })(req(`https://t.wiki${p}`)), undefined, `act: ${p}`);
 });
 
 test('openPaths replaces the machine-path default, so a wiki whose /skills/ is docs can keep it gated', async () => {

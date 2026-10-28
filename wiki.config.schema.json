@@ -186,9 +186,10 @@
     "superlinks": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Superlinks (1.21.0): one article sent to one person. `shut` lists link ids that no longer open; a shut id shuts every link forwarded from it.",
+      "description": "Superlinks (1.21.0): one article sent to one person. `shut` lists link ids that no longer open; a shut id shuts every link forwarded from it, at any depth. `parents` maps each forwarded link id to the id it was forwarded from, so a shut reaches a forward of a forward; the edge walks at most 16 ancestors and refuses a longer chain.",
       "properties": {
-        "shut": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9]{12}$" }, "uniqueItems": true }
+        "shut": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9]{12}$" }, "uniqueItems": true },
+        "parents": { "type": "object", "propertyNames": { "pattern": "^[a-z0-9]{12}$" }, "additionalProperties": { "type": "string", "pattern": "^[a-z0-9]{12}$" } }
       }
     },
     "hero_register": {

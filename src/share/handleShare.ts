@@ -45,6 +45,9 @@ export interface ShareRequest {
   /** Superlink ids that no longer open (wiki.config.json `superlinks.shut`). A shut id also shuts
    *  every link forwarded from it. */
   shut?: readonly string[];
+  /** The superlink lineage beyond each token's signed parent (wiki.config.json
+   *  `superlinks.parents`, rid -> parent rid), so a shut id shuts forwards of forwards too (#9). */
+  parents?: Readonly<Record<string, string>>;
   /** The request's Accept header: JSON gets a 401 naming the sign-in, anything else a 303. */
   accept?: string | null;
   /** The gate's `cannotAct` (act mode): this reader may read but not mint. */
@@ -111,7 +114,7 @@ export async function handleShare(req: ShareRequest): Promise<Response | undefin
   }
 
   // A superlink is tried first: its token has dots, so it can never parse as a one-page share.
-  const link = await verifySuperlink(secret, url.pathname, { shut: req.shut });
+  const link = await verifySuperlink(secret, url.pathname, { shut: req.shut, parents: req.parents });
   if (link && link.state !== 'open') {
     return new Response(GONE, { status: 410, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' } });
   }

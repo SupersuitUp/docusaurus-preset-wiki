@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createMiddleware, MATCHER } from './middleware';
+import { createMiddleware, createMiddlewareFromConfig, MATCHER } from './middleware';
+import { mintSuperlink } from './share/superlink';
 import { matcherFor } from './cli/matcher.mjs';
 
 const req = (url: string, ua = 'Mozilla/5.0', extra: Record<string, string> = {}) =>
@@ -95,4 +96,17 @@ test('the skills-are-pages matcher sends the bulk exports to the gate and still 
     assert.equal(re.test(p), true, `${p} reaches the gate`);
   for (const p of ['/skills/x/SKILL.md', '/img/a.webp.recipe.json', '/manifest.json', '/old-routes.json', '/assets/js/a.js'])
     assert.equal(re.test(p), false, `${p} is skipped`);
+});
+
+test('superlinks.parents in wiki.config.json reaches the edge: a forward of a forward of a shut link is 410 (#9)', async () => {
+  process.env.WIKI_SHARE_SECRET = 'mw-chain-secret';
+  try {
+    const a = (await mintSuperlink('mw-chain-secret', '/concepts/x', { forward: 'open' }))!;
+    const b = (await mintSuperlink('mw-chain-secret', '/concepts/x', { forward: 'open', parent: a.rid }))!;
+    const c = (await mintSuperlink('mw-chain-secret', '/concepts/x', { forward: 'open', parent: b.rid }))!;
+    const mw = createMiddlewareFromConfig({ analytics: false, superlinks: { shut: [a.rid], parents: { [b.rid]: a.rid, [c.rid]: b.rid } } });
+    assert.equal((await mw(req('https://t.wiki' + c.path)))?.status, 410);
+  } finally {
+    delete process.env.WIKI_SHARE_SECRET;
+  }
 });

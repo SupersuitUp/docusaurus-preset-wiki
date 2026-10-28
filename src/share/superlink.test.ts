@@ -2,7 +2,7 @@
 // which link it is, without a database and without the person's name inside it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mintSuperlink, verifySuperlink, parseSuperlink } from './superlink';
+import { mintSuperlink, verifySuperlink, parseSuperlink, MAX_FORWARD_DEPTH } from './superlink';
 import { parseSharePath } from './signedRoute';
 
 const S = 'secret-for-tests';
@@ -62,4 +62,50 @@ test('a wiki not yet on the package can reach superlinks and the read sender fro
   for (const name of ['mintSuperlink', 'verifySuperlink', 'parseSuperlink', 'buildEvent', 'sendEvent', 'resolveSink']) {
     assert.equal(typeof (mw as Record<string, unknown>)[name], 'function', name);
   }
+});
+
+// Rule 7 of the superlink standard (https://hypercontext.wiki/standards/superlink/v1): a forward
+// never outlives its parent, at ANY depth (#9). The token carries only the immediate parent, so the
+// rest of the chain comes from the committed lineage (`superlinks.parents`, rid -> parent rid).
+async function chain() {
+  const a = (await mintSuperlink(S, '/a', { forward: 'open' }))!;
+  const b = (await mintSuperlink(S, '/a', { forward: 'open', parent: a.rid }))!;
+  const c = (await mintSuperlink(S, '/a', { forward: 'open', parent: b.rid }))!;
+  return { a, b, c, parents: { [b.rid]: a.rid, [c.rid]: b.rid } };
+}
+
+test('a forward of a forward is shut when the original link is shut (#9)', async () => {
+  const { a, b, c, parents } = await chain();
+  for (const l of [a, b, c]) {
+    assert.deepEqual(await verifySuperlink(S, l.path, { now: NOW, shut: [a.rid], parents }), { state: 'shut', rid: l.rid });
+  }
+});
+
+test('an unshut chain still opens, and shutting the middle shuts below it, never above', async () => {
+  const { a, b, c, parents } = await chain();
+  assert.equal((await verifySuperlink(S, c.path, { now: NOW, shut: [], parents }))!.state, 'open');
+  assert.equal((await verifySuperlink(S, c.path, { now: NOW, shut: ['zzzzzzzzzzzz'], parents }))!.state, 'open');
+  assert.equal((await verifySuperlink(S, c.path, { now: NOW, shut: [b.rid], parents }))!.state, 'shut');
+  assert.equal((await verifySuperlink(S, b.path, { now: NOW, shut: [b.rid], parents }))!.state, 'shut');
+  assert.equal((await verifySuperlink(S, a.path, { now: NOW, shut: [b.rid], parents }))!.state, 'open');
+});
+
+test('the signed parent wins over the lineage: a lookup cannot reparent a link out of a shut chain', async () => {
+  const { a, c, parents } = await chain();
+  const lying = { ...parents, [c.rid]: 'zzzzzzzzzzzz' };
+  assert.equal((await verifySuperlink(S, c.path, { now: NOW, shut: [a.rid], parents: lying }))!.state, 'shut');
+});
+
+test('a chain deeper than the bound, or a loop in the lineage, fails closed', async () => {
+  const leaf = (await mintSuperlink(S, '/a', { forward: 'open', parent: 'p00000000001' }))!;
+  const deep = (n: number) => {
+    const m: Record<string, string> = {};
+    for (let i = 1; i < n; i += 1) m[`p${String(i).padStart(11, '0')}`] = `p${String(i + 1).padStart(11, '0')}`;
+    return m;
+  };
+  // MAX_FORWARD_DEPTH ancestors in all opens; one more is refused without being read.
+  assert.equal((await verifySuperlink(S, leaf.path, { now: NOW, parents: deep(MAX_FORWARD_DEPTH) }))!.state, 'open');
+  assert.equal((await verifySuperlink(S, leaf.path, { now: NOW, parents: deep(MAX_FORWARD_DEPTH + 1) }))!.state, 'shut');
+  const loop = { p00000000001: 'p00000000002', p00000000002: 'p00000000001' };
+  assert.equal((await verifySuperlink(S, leaf.path, { now: NOW, parents: loop }))!.state, 'shut');
 });

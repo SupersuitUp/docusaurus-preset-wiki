@@ -12,6 +12,14 @@
 // only the id. Shutting one link is a committed list of ids the edge reads; a shut id shuts every
 // link forwarded from it, because the parent is part of what is signed.
 //
+// A FORWARD NEVER OUTLIVES ITS PARENT, AT ANY DEPTH (rule 7 of
+// https://hypercontext.wiki/standards/superlink/v1, issue #9). The token signs only the immediate
+// parent, so for A -> B -> C the edge holding C knows B and nothing about A. The rest of the chain
+// is the committed lineage `superlinks.parents` (rid -> parent rid), written beside `shut` by
+// whatever mints a forward. The walk starts from the SIGNED parent (the lineage can never reparent
+// a link out of a shut chain), follows the lineage at most MAX_FORWARD_DEPTH ancestors, and refuses
+// past that bound or on a loop. A rid with no lineage entry ends the chain, as a root does.
+//
 // Pure, Web Crypto only: runs in the edge runtime, the browser and under `node --test` unchanged.
 
 import { SHARE_PREFIX, canonicalRoute } from './signedRoute';
@@ -22,6 +30,10 @@ const MODE: Record<string, ForwardMode> = { n: 'off', s: 'signed-in', o: 'open' 
 const DOMAIN = 'wiki-superlink:v1:';
 const TOKEN = /^([a-z0-9]{12})\.([a-z0-9]{12}|0)\.([nso])([0-9a-z]{1,9})\.([A-Za-z0-9_-]{22})$/;
 const encoder = new TextEncoder();
+
+/** How many ancestors the edge will walk. A chain longer than this is refused unread (fail closed):
+ *  the bound is what keeps the hot path a handful of map lookups. */
+export const MAX_FORWARD_DEPTH = 16;
 
 function base64url(bytes: ArrayBuffer): string {
   let binary = '';
@@ -76,12 +88,13 @@ export type SuperlinkVerdict =
   | { state: 'open'; route: string; rid: string; parent: string | null; forward: ForwardMode }
   | { state: 'shut' | 'expired'; rid: string };
 
-/** The verdict on a superlink path: open (with its route), shut (its id or its parent's is on the
- *  shut list), expired, or null when it is not a genuine superlink under this secret. */
+/** The verdict on a superlink path: open (with its route), shut (its id or any ancestor's is on the
+ *  shut list, or its chain is past MAX_FORWARD_DEPTH or loops), expired, or null when it is not a
+ *  genuine superlink under this secret. `parents` is the lineage beyond the signed parent. */
 export async function verifySuperlink(
   secret: string,
   pathname: string,
-  opts: { now?: number; shut?: readonly string[] } = {},
+  opts: { now?: number; shut?: readonly string[]; parents?: Readonly<Record<string, string>> } = {},
 ): Promise<SuperlinkVerdict | null> {
   const p = parseSuperlink(pathname);
   if (!p || !secret) return null;
@@ -91,7 +104,21 @@ export async function verifySuperlink(
   for (let i = 0; i < expected.length; i += 1) diff |= expected.charCodeAt(i) ^ p.sig.charCodeAt(i);
   if (diff !== 0) return null;
   const shut = opts.shut ?? [];
-  if (shut.includes(p.rid) || (p.parent !== '0' && shut.includes(p.parent))) return { state: 'shut', rid: p.rid };
+  if (chainShut(p.rid, p.parent, shut, opts.parents ?? {})) return { state: 'shut', rid: p.rid };
   if (p.exp !== '0' && parseInt(p.exp, 36) * 1000 <= (opts.now ?? Date.now())) return { state: 'expired', rid: p.rid };
   return { state: 'open', route: p.route, rid: p.rid, parent: p.parent === '0' ? null : p.parent, forward: MODE[p.flag] };
+}
+
+/** Whether a link, or any link up its chain, no longer opens. `parent` is the token's signed parent
+ *  ('0' for none); every hop above it comes from the lineage. */
+function chainShut(rid: string, parent: string, shut: readonly string[], parents: Readonly<Record<string, string>>): boolean {
+  if (shut.includes(rid)) return true;
+  const seen = new Set([rid]);
+  let at: string | undefined = parent === '0' ? undefined : parent;
+  for (let depth = 1; at; depth += 1) {
+    if (depth > MAX_FORWARD_DEPTH || seen.has(at) || shut.includes(at)) return true;
+    seen.add(at);
+    at = Object.prototype.hasOwnProperty.call(parents, at) ? parents[at] : undefined;
+  }
+  return false;
 }

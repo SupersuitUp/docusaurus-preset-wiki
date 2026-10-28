@@ -107,7 +107,10 @@ optional expiry. The reader gets the same one-article view as `/s/<sig>/<route>`
 names the link (`reader: "link:<rid>"`, `link: { rid }`), never a person. **The name goes to the
 reads sink once**, in a `mint` event (`link: { rid, label }`), so it never rides in a link someone
 could forward. `superlinks.shut` in `wiki.config.json` lists ids that no longer open; a shut id
-shuts every link forwarded from it, and a shut or expired link answers 410 with nothing of the page.
+shuts every link forwarded from it, at any depth, and a shut or expired link answers 410 with
+nothing of the page. A token signs only its immediate parent, so the rest of a chain comes from
+`superlinks.parents` (forwarded rid -> the rid it came from), written beside `shut` by whatever
+mints a forward; the edge walks at most 16 ancestors and refuses a longer chain or a loop.
 The mint is refused on an open wiki (anyone there reads as authorized, so anyone could write a name
 into the reads) and `--to` never falls back to the whole-wiki key link. Existing `/s/<sig>` links
 keep opening, read as anonymous.

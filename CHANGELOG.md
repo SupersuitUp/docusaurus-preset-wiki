@@ -5,6 +5,24 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## Unreleased
+
+**A forward of a forward of a shut superlink no longer opens (#9).** Rule 7 of the superlink
+standard (https://hypercontext.wiki/standards/superlink/v1) is that a forward never outlives its
+parent, but the edge checked only a link and its immediate parent against `superlinks.shut`, so for
+A -> B -> C, shutting A shut B while C still opened. The token signs only the immediate parent, so
+the rest of the chain now comes from a committed lineage, `superlinks.parents` in `wiki.config.json`
+(forwarded rid -> the rid it was forwarded from), read by `createMiddlewareFromConfig` and passed as
+`parents` to `handleShare`/`verifySuperlink`. The edge walks from the SIGNED parent (the lineage can
+never reparent a link out of a shut chain), follows at most `MAX_FORWARD_DEPTH` (16) ancestors, and
+fails closed past that bound or on a loop. DETECTOR: a wiki whose `superlinks.shut` names a link
+that has forwards two or more levels deep. REMEDY: once a release carries this, record each forward
+in `superlinks.parents` beside `shut`; a rid with no entry ends its chain the way a root does.
+Tests: `src/share/superlink.test.ts` (A -> B -> C with A shut refuses C; an unshut chain opens;
+shutting B refuses C but not A; a lying lineage cannot reparent; 16 ancestors open, 17 or a loop
+refuse), `src/share/handleShare.test.ts` (410 for C), `src/middleware.test.ts` (the config key
+reaches the edge), `src/config-schema.test.ts` (the schema accepts `parents`).
+
 ## 1.24.0 (2026-10-28)
 
 **The Share button is a public export, `@supersuit/docusaurus-preset-wiki/share-button`.** Four

@@ -25,3 +25,11 @@ test('every key of the gate block (WikiGateConfig) is a property of the schema g
   for (const k of keys) assert.ok(k in gate.properties, `wiki.config.schema.json gate has no "${k}"`);
   assert.deepEqual(gate.properties.mode.enum, ['read', 'act']);
 });
+
+test('the superlink lineage (superlinks.parents, #9) is in the schema, rid to rid', () => {
+  const schema = JSON.parse(readFileSync(new URL('../wiki.config.schema.json', import.meta.url), 'utf8'));
+  const parents = schema.properties.superlinks.properties.parents;
+  assert.ok(parents, 'wiki.config.schema.json superlinks has no "parents"');
+  assert.equal(parents.propertyNames.pattern, '^[a-z0-9]{12}$');
+  assert.equal(parents.additionalProperties.pattern, '^[a-z0-9]{12}$');
+});

@@ -73,6 +73,8 @@ export interface MiddlewareOptions {
   shareAdmins?: readonly string[] | (() => readonly string[] | undefined);
   /** Superlink ids that no longer open: `superlinks.shut` in wiki.config.json. */
   shut?: readonly string[];
+  /** The superlink lineage, rid -> parent rid: `superlinks.parents` in wiki.config.json (#9). */
+  parents?: Readonly<Record<string, string>>;
 }
 
 export {
@@ -153,6 +155,7 @@ export function createMiddleware(opts: MiddlewareOptions = {}) {
       reader: verdict.reader,
       shareAdmins: typeof opts.shareAdmins === 'function' ? opts.shareAdmins() ?? [] : opts.shareAdmins,
       shut: opts.shut,
+      parents: opts.parents,
       cannotAct: verdict.authorized ? verdict.cannotAct : undefined,
       accept: request.headers.get('accept'),
     });
@@ -240,6 +243,6 @@ export type { WikiGateConfig, WikiGateType } from './gate/fromConfig';
  *   import wiki from './wiki.config.json';
  *   export default createMiddlewareFromConfig(wiki);
  */
-export function createMiddlewareFromConfig(wiki: { gate?: WikiGateConfigShape; analytics?: AnalyticsOption; superlinks?: { shut?: readonly string[] } }) {
-  return createMiddleware({ gate: gateFromConfigFn(wiki.gate), analytics: wiki.analytics, shareAdmins: shareAdminsFromConfig(wiki.gate), shut: wiki.superlinks?.shut });
+export function createMiddlewareFromConfig(wiki: { gate?: WikiGateConfigShape; analytics?: AnalyticsOption; superlinks?: { shut?: readonly string[]; parents?: Readonly<Record<string, string>> } }) {
+  return createMiddleware({ gate: gateFromConfigFn(wiki.gate), analytics: wiki.analytics, shareAdmins: shareAdminsFromConfig(wiki.gate), shut: wiki.superlinks?.shut, parents: wiki.superlinks?.parents });
 }

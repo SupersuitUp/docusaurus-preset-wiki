@@ -111,6 +111,16 @@ test('superlink: a shut link, or one forwarded from it, answers 410 and shows no
   }
 });
 
+test('superlink: a forward of a forward answers 410 once the original is shut (#9)', async () => {
+  const a = (await mintSuperlink(SECRET, '/concepts/x', { forward: 'open' }))!;
+  const b = (await mintSuperlink(SECRET, '/concepts/x', { forward: 'open', parent: a.rid }))!;
+  const c = (await mintSuperlink(SECRET, '/concepts/x', { forward: 'open', parent: b.rid }))!;
+  const parents = { [b.rid]: a.rid, [c.rid]: b.rid };
+  const r = (await handleShare({ url: new URL(c.path, ORIGIN), authorized: false, secret: SECRET, gated: true, shut: [a.rid], parents }))!;
+  assert.equal(r.status, 410);
+  assert.equal(r.headers.get('x-middleware-rewrite'), null);
+});
+
 test('superlink: a forged one falls through to the gate like any unknown path', async () => {
   const m = (await mintSuperlink(SECRET, '/concepts/x', { forward: 'off' }))!;
   assert.equal(await req(m.path.replace('/concepts/x', '/concepts/y')), undefined);

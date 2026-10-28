@@ -31,6 +31,10 @@
     "./tldr": {
       "types": "./lib/tldr/tldr.d.mts",
       "default": "./lib/tldr/tldr.mjs"
+    },
+    "./share-button": {
+      "types": "./lib/theme/ShareButton/index.d.ts",
+      "default": "./lib/theme/ShareButton/index.js"
     }
   },
   "bin": {

@@ -5,6 +5,18 @@ existed, the same framework shipped as copied files from `SupersuitUp/wiki-templ
 repo's `UPGRADE-LEDGER.md` recorded each version with a detector and a remedy; those entries are
 carried in below under "Before the package" so the history reads in one place.
 
+## Unreleased
+
+**The Share button is a public export, `@supersuit/docusaurus-preset-wiki/share-button`.** Four
+theme-classic wikis (hyperagency, appliedai, agenticbusiness, truth-management) render it from
+their own `DocMetaRow` and imported it by a file path into node_modules
+(`@site/node_modules/@supersuit/docusaurus-preset-wiki/lib/theme/ShareButton`), which skips the
+`exports` map and would break silently on any change to the build layout. DETECTOR: `grep -rn
+"node_modules/@supersuit/docusaurus-preset-wiki" src/` in a wiki. REMEDY: once a release carries
+this, switch that import to the subpath. Tests: `src/theme/ShareButton/share-button-export.test.mjs`
+resolves the subpath under the import and require conditions, loads the component, and checks
+the declared types file is emitted.
+
 ## 1.23.0 (2026-10-28)
 
 **The bulk exports of a gated wiki are behind the account (supersuit-wiki#15, approved by Gary

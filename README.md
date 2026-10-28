@@ -294,6 +294,11 @@ and `@theme-original/<Component>` inside it is the package's version. Override o
 copy the package's directories back into the instance: `wiki check owned-files` fails the build
 when a path the package owns reappears, because that fork is what this package exists to end.
 
+**A theme-classic wiki that swizzles its own `DocMetaRow` imports the Share button by name:**
+`import ShareButton from '@supersuit/docusaurus-preset-wiki/share-button';`. Never reach into
+`node_modules/.../lib/theme/ShareButton` by path: that bypasses the `exports` map and breaks
+silently the day the build layout moves.
+
 ## Developing the package
 
 ```bash

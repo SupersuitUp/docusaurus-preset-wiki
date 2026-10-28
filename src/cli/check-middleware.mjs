@@ -14,7 +14,7 @@
 // (src/cli/matcher.mjs). A wiki picks among the package's literals and never writes its own.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { matcherSource, declaredMatcher } from "./matcher.mjs";
+import { matcherSource, declaredMatcher, retiredMatchers } from "./matcher.mjs";
 
 const ROOT = process.cwd();
 const file = join(ROOT, "middleware.ts");
@@ -37,7 +37,9 @@ if (!/export\s+const\s+config\s*=/.test(src)) {
   problems.push("no `export const config = { ... }` in middleware.ts; the middleware will run on every path.");
 }
 if (!src.includes(`'${literal}'`) && !src.includes(`"${literal}"`)) {
-  problems.push(`the matcher literal differs from the package's ${name ? `"${name}" variant` : "family matcher"} (or is missing). Copy it exactly:\n    '` + literal + "'");
+  const retired = retiredMatchers().find((r) => src.includes(`'${r.source}'`) || src.includes(`"${r.source}"`));
+  problems.push(`the matcher literal differs from the package's ${name ? `"${name}" variant` : "family matcher"} (or is missing). Copy it exactly:\n    '` + literal + "'"
+    + (retired ? `\n  The literal in this file is retired: ${retired.why}` : ""));
 }
 if (problems.length) {
   console.error("[middleware] " + problems.join("\n[middleware] "));

@@ -1,10 +1,20 @@
 {
   "matcher": [
-    "/((?!assets/|img/|skills/|generators/|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|.*\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml)$).*)"
+    "/((?!assets/|img/|skills/|generators/|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|(?!search-index\\.json$).*\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml)$).*)"
   ],
   "variants": {
     "skills-are-pages": [
       "/((?!assets/|img/|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|(?!search-index\\.json$).*\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml|md)$).*)"
     ]
-  }
+  },
+  "retired": [
+    {
+      "matcher": "/((?!assets/|img/|skills/|generators/|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|.*\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml)$).*)",
+      "why": "this is the family matcher from before 2026-10-28: it skipped every .json, so the middleware never ran on /search-index.json and a gated wiki served the text of every page to anyone (docusaurus-preset-wiki#7)."
+    },
+    {
+      "matcher": "/((?!assets/|img/|favicon\\.ico|robots\\.txt|llms\\.txt|llms-full\\.txt|sitemap\\.xml|manifest\\.json|.*\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml|md)$).*)",
+      "why": "this is the skills-are-pages matcher from before 2026-10-28: it skipped llms.txt, llms-full.txt and every .json, so a gated wiki served the text of every page to anyone (supersuit-wiki#15)."
+    }
+  ]
 }

@@ -32,7 +32,7 @@ export { default } from '@supersuit/docusaurus-preset-wiki/middleware';
 // literal; `wiki check middleware` refuses a build where it drifts from the package's.
 export const config = {
   matcher: [
-    '/((?!assets/|img/|skills/|generators/|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|.*\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml)$).*)',
+    '/((?!assets/|img/|skills/|generators/|favicon\\.ico|robots\\.txt|sitemap\\.xml|manifest\\.json|(?!search-index\\.json$).*\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml)$).*)',
   ],
   runtime: 'edge',
 };
@@ -178,7 +178,8 @@ calls. See `src/gate/`.
 A preloaded link is `<any page>?key=<password>`: it sets a thirty-day ticket cookie and lands the
 reader on the page, with the key stripped from the address. Any capitalization of the password
 works. `llms.txt`, `skills/`, `generators/` and media stay open for agents that cannot answer a
-door. A password with no secret fails open and says so in an `x-wiki-gate` header.
+door (the account gate instead keys `llms.txt`, `llms-full.txt` and `search-index.json`: the hourly
+key, a pass, or a signed-in browser). A password with no secret fails open and says so in an `x-wiki-gate` header.
 
 **A wiki with its own gate** (Google identity, a member list) supplies its verdict instead:
 

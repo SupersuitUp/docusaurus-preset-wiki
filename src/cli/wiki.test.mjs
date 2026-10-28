@@ -73,6 +73,17 @@ test('check middleware refuses a re-exported config and accepts the literal', ()
   assert.equal(run(d, 'check', 'middleware').status, 1);
 });
 
+test('check middleware refuses the pre-#7 family literal and says why it changed (preset#7)', () => {
+  const d = site();
+  const OLD = '/((?!assets/|img/|skills/|generators/|favicon\\\\.ico|robots\\\\.txt|sitemap\\\\.xml|manifest\\\\.json|.*\\\\.(?:js|css|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|map|json|webmanifest|xml)$).*)';
+  writeFileSync(join(d, 'middleware.ts'), `export { default } from '@supersuit/docusaurus-preset-wiki/middleware';\nexport const config = { matcher: ['${OLD}'], runtime: 'edge' };\n`);
+  const r = run(d, 'check', 'middleware');
+  assert.equal(r.status, 1);
+  const { matcher } = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'matcher.json'), 'utf8'));
+  assert.ok(r.stderr.includes(matcher[0].replace(/\\/g, '\\\\')), 'names the new literal to copy');
+  assert.match(r.stderr, /search-index\.json/, 'says what the old literal left open');
+});
+
 test('check admonitions fails on the broken form', () => {
   const d = site();
   writeFileSync(join(d, 'docs', 'b.md'), '---\ntitle: B\n---\n\n# B\n\n:::note Title\ntext\n:::\n');

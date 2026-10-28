@@ -22,8 +22,16 @@ account-gated wiki served its `search-index.json` the same way.
 - The `skills-are-pages` matcher no longer skips `llms.txt`, `llms-full.txt` or
   `search-index.json`, so the gate sees them. **A wiki on that variant must copy the new literal
   into its middleware.ts** when it takes this release; `wiki check middleware` names it.
-- Not yet covered: the family (`default`) matcher still skips every `.json`, so a gated wiki on it
-  keeps serving `search-index.json` until that literal changes too, which every instance must copy.
+- **The family (`default`) matcher now sends `search-index.json` to the gate too
+  (docusaurus-preset-wiki#7).** It skipped every `.json`, so the middleware never ran on the
+  search index and 17 account-gated wikis served the full text of every page to anyone while their
+  pages answered 401. Every other `.json` (manifest, recipes, `old-routes.json`) is still skipped.
+  **Every instance must copy the new literal into its middleware.ts.** DETECTOR: `wiki check
+  middleware` fails on the old literal, prints the new one, and says why the old one was retired
+  (matcher.json now keeps retired literals for exactly that). REMEDY: paste the literal it prints.
+  Tests: src/middleware.test.ts (the family matcher reaches `/search-index.json`, `/llms.txt`,
+  `/llms-full.txt` and still skips other `.json`) and src/cli/wiki.test.mjs (the check refuses the
+  pre-#7 literal and names both the new literal and `search-index.json`); seen red before the fix.
 
 ## 1.22.0 (2026-10-27)
 
